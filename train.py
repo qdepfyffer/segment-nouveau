@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 from components.losses import build_loss
 from components.optimizers import build_optimizer, OPTIMIZERS
-from components.transforms import training_transform, PadToSize
+from components.transforms import training_transform
 from dataset import SegmentationDataset
 from models import build_model, MODELS
 from components.metrics import confusion_counts, scores_from_counts
@@ -33,12 +33,11 @@ def parse_args():
     parser.add_argument("--optimizer", type=str, choices=list(OPTIMIZERS), default="rmsprop", help="Which optimizer to use during training")
     parser.add_argument("--dice_weight", type=float, default=0.0, help="Determines dice weight to be used for loss - cross-entropy plus dice weight multiplied by dice loss - 0 to disable dice loss")
     parser.add_argument("--epochs", type=int, default=100, help="Maximum number of epochs to train for (passes over the training set)")
-    parser.add_argument("--monitor", type=str, default="valid_loss", choices=["valid_loss", "sunlit_iou", "f1", "mean_iou", "precision"], help="Which metric to monitor during training for early stopping")
+    parser.add_argument("--monitor", type=str, default="valid_loss", choices=["valid_loss", "sunlit_iou", "f1", "mean_iou", "precision"], help="Which metric to monitor during training for early stopping and determining the best model to save")
     parser.add_argument("--patience", type=int, default=7, help="How many epochs to continue training for without seeing improvement in the monitored value")
-    parser.add_argument("--batch_size", type=int, default=8, help="Number of images in each training / evaluation batch")
+    parser.add_argument("--batch_size", type=int, default=8, help="Number of images in each training batch")
     parser.add_argument("--lr", type=float, default=1e-4, help="The learning rate of the model")
     parser.add_argument("--train_crop", nargs=2, type=int, default=[256, 480], help="The size of the random crop that is applied to training images (h x w)")
-    parser.add_argument("--eval_pad", nargs=2, type=int, default=[288, 512], help="Pads validation images to the given size (h x w)")
     parser.add_argument("--output_dir", type=Path, default=Path("checkpoints"), help="The folder this script should output to")
     parser.add_argument("--seed", type=int, default=42, help="Number to use as a random seed for anything that can be seeded")
     return parser.parse_args()
@@ -65,17 +64,16 @@ def main() -> None:
     with open(out_dir / "settings.json", "w") as file:
         json.dump(settings, file, indent=4, default=str)
 
-    # Build specified modelargs.monitor
+    # Build specified model
     model = build_model(args.architecture, num_classes=2)
     model = model.to("cuda")  # Move model to GPU
 
     # Load our datasets
     train_ds = SegmentationDataset(args.data_root, args.crop, "train",
                                    transform=training_transform(args.train_crop[0], args.train_crop[1]))
-    valid_ds = SegmentationDataset(args.data_root, args.crop, "valid",
-                                   transform=PadToSize(args.eval_pad[0], args.eval_pad[1]))
+    valid_ds = SegmentationDataset(args.data_root, args.crop, "valid")
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, drop_last=True)
-    valid_loader = DataLoader(valid_ds, batch_size=args.batch_size)
+    valid_loader = DataLoader(valid_ds, batch_size=1)  # Validate with a batch size of 1 so images don't need to be the same size
 
     # Set optimizer and loss function
     optimizer = build_optimizer(args.optimizer, model.parameters(), args.lr)

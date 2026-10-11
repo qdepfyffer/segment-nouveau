@@ -11,7 +11,7 @@ For reference: This repo was built based on [AIISLab segment-main](https://githu
 
 ### Important notes:
  - Running these scripts requires an NVIDIA GPU
- - Default crop and pad sizes were chosen for the tomato dataset, other datasets will need this set to be specific to them
+ - Default crop size was chosen for the tomato dataset, other datasets will need this set to be specific to them
 
 ## Dataset Requirements:  
 Your dataset should follow the example structure below. In short: One directory containing directories for each crop, each with their own test, train, and valid folders, with each split having a visual and label folder. Extra folders are ignored.
@@ -100,13 +100,44 @@ pip install -r requirements.txt
 
 ## Training a model
 
-*Coming Soon*
+**Example usage**: `python train.py --data_root path/to/dataset --crop tomato --epochs 100 --patience 7 --batch_size 8 --lr 1e-4`
 
 Checkpoints are saved to `checkpoints/crop/timestamp/architecture-best.pt` by default, along with the `settings.json` that was used to produce them.
 
+### Command line arguments (Training)
+
+| Argument         | Description                                                                                                                   | Example                  |
+|------------------|-------------------------------------------------------------------------------------------------------------------------------|--------------------------|
+| `--data_root`    | Root dataset directory, should have a subdirectory for the crop you want to train on                                          | `/home/ciwa-full-split/` |
+| `--crop`         | The crop (name of subdirectory within the dataset root directory) you want to train on                                        | `tomato`                 |
+| `--architecture` | Which model to train                                                                                                          | `deeplabv3`              |
+| `--optimizer`    | Which optimizer to use during training                                                                                        | `rmsprop`                |
+| `--dice_weight`  | Determines dice weight to be used for loss - cross-entropy plus dice weight multiplied by dice loss - 0 to disable dice loss  | `1.0`                    |
+| `--epochs`       | Maximum number of epochs to train for (passes over the training set)                                                          | `100`                    |
+| `--monitor`      | Which metric to monitor during training for early stopping and determining the best model to save                             | `valid_loss`             |
+| `--patience`     | How many epochs to continue training for without seeing improvement in the monitored value                                    | `7`                      |
+| `--batch_size`   | Number of images in each training batch                                                                                       | `8`                      |
+| `--lr`           | The learning rate of the model                                                                                                | `1e-4`                   |
+| `--train_crop`   | The size of the random crop that is applied to training images (h x w)                                                        | `256 480`                |
+| `--output_dir`   | The folder this script should output to                                                                                       | `checkpoints/`           |
+| `--seed`         | Number to use as a random seed for anything that can be seeded                                                                | `42`                     |
+
+
 ## Evaluating a model
 
-*Coming Soon*
+**Example usage**: `python evaluate.py --checkpoint checkpoints/tomato/2026-10-11_07-48-57/ --crop tomato --split test`
+
+Evaluation results are saved to `eval/checkpoint/<crop>-<split>.json` by default, where "crop" represents the evaluated dataset and "split" the evaluated split.
+
+### Command line arguments (Evaluation)
+
+| Argument       | Description                                                                                                                | Example                                    |
+|----------------|----------------------------------------------------------------------------------------------------------------------------|--------------------------------------------|
+| `--checkpoint` | Path to the folder containing the desired checkpoint and settings.json                                                     | `checkpoints/tomato/2026-10-11_07-48-57//` |
+| `--crop`       | The crop (name of subdirectory within the dataset root directory) you want to use in evaluation                            | `tomato`                                   |
+| `--split`      | The split the model should consider for evaluation                                                                         | `test`                                     |
+| `--output_dir` | The folder this script should output to                                                                                    | `eval/`                                    |
+| `--data_root`  | Root dataset directory override, for when the data_root in the model's settings.json does not exist on the current machine | `/home/ciwa-full-split/`                   |
 
 ## Extending the suite
 
@@ -116,40 +147,42 @@ Checkpoints are saved to `checkpoints/crop/timestamp/architecture-best.pt` by de
 
 ### Adding a new loss function
 
-*See `losses.py`*
+*See `components/losses.py`*
 
 ### Adding a new optimizer
 
-*See `optimizers.py`*
+*See `components/optimizers.py`*
 
 ### Adding new transforms
 
-*See `transforms.py`*
+*See `components/transforms.py`*
 
 ## Repo Contents
-| File                     | Contents                                                                                |
-|--------------------------|-----------------------------------------------------------------------------------------|
-| `components/`            | `__init__.py`, `losses.py`, `metrics.py`, `optimizers.py`, `transforms.py`              |
-| `__init__.py`            | Empty                                                                                   |
-| `losses.py`              | Builder and implementations for the loss functions used during model training           |
-| `metrics.py`             | Functions needed for the evaluation and scoring of models                               |
-| `optimizers.py`          | Builder and implementations for the optimizers used during model training               |
-| `transforms.py`          | Builder and implementations for any transforms used during model training or evaluation |
-| `models/`                | `__init__.py`, `deeplabv3.py`                                                           |
-| `__init__.py`            | Dictionary of available models and a model builder function                             |
-| `deeplabv3.py`           | Implementation of the DeepLabV3 model with a MobileNetV3 backbone                       |
-| `dataset.py`             | Finds images and their corresponding labels, loads them, ensures they match             |
-| `evaluate.py`            | Evaluation logic and loop, this is what you run to train the models                     |
-| `README.md`              | What you're reading now.                                                                |
-| `requirements.txt`       | Non-torch project requirements                                                          |
-| `requirements-torch.txt` | Torch-specific project requirements                                                     |
-| `train.py`               | Training logic and loop, this is what you run to train the models                       |
+| File                     | Contents                                                                                                              |
+|--------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| `components/`            | `__init__.py`, `losses.py`, `metrics.py`, `optimizers.py`, `transforms.py`                                            |
+| `__init__.py`            | Empty                                                                                                                 |
+| `losses.py`              | Builder and implementations for the loss functions used during model training                                         |
+| `metrics.py`             | Functions needed for the evaluation and scoring of models                                                             |
+| `optimizers.py`          | Builder and implementations for the optimizers used during model training                                             |
+| `transforms.py`          | Builder and implementations for any transforms used during model training or evaluation                               |
+| `models/`                | `__init__.py`, `deeplabv3.py`                                                                                         |
+| `__init__.py`            | Dictionary of available models and a model builder function                                                           |
+| `deeplabv3.py`           | Implementation of the DeepLabV3 model with a MobileNetV3 backbone                                                     |
+| `sizing.py`              | Function to pad a batch of images on the right/bottom via reflection so height and width cleanly divide by `multiple` |
+| `dataset.py`             | Finds images and their corresponding labels, loads them, ensures they match                                           |
+| `evaluate.py`            | Evaluation logic and loop, this is what you run to evaluate the models                                                |
+| `README.md`              | What you're reading now.                                                                                              |
+| `requirements.txt`       | Non-torch project requirements                                                                                        |
+| `requirements-torch.txt` | Torch-specific project requirements                                                                                   |
+| `train.py`               | Training logic and loop, this is what you run to train the models                                                     |
 
 
 ## Design decisions, or alternatively "Why would you rebuild a perfectly good* tool?"
 
  - Images are never stretched. If models expect inputs to have a specific aspect ratio, we instead take a randomly cropped window from our full images, so that the model isn't learning from a distorted view of our data. This follows the approach of the suite used in the earlier papers.
- - Validation images are padded, and padded pixels are ignored. This is used to fix an issue with inconsistent image sizes within batches that was silently ignored in the most recent CIWA+ paper, due to the aforementioned stretching of images.
+ - During training images are padded out to clean multiples of a size specified by the model implementation. This padding uses mirroring rather than black pixels. Never pad with black.
+ - Validation images handled with a batch size of 1. This is to allow for the differently sized images within the tomato dataset. Previous implementations stretched everything to 512x512, so never had batches of mixed sizes.
  - This suite works out of the box with the canonical CIWA+ dataset. You shouldn't have to reorganize any files. If you still want to use the old dataset layout from the other repos, I plan to add support for that eventually.
  - No need for per-dataset files containing classes. It was the same file in every dataset, so the class specifications now live at the top of dataset.py. I can add support for a per-dataset `.csv` file later, which would override any hard-coded class specifications.
  - Defaults are set to match earlier papers / repos where applicable.
