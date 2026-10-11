@@ -11,12 +11,12 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from dataset import SegmentationDataset
 from components.losses import build_loss
-from models import build_model, MODELS
 from components.optimizers import build_optimizer, OPTIMIZERS
 from components.transforms import training_transform, PadToSize
-
+from dataset import SegmentationDataset
+from models import build_model, MODELS
+from components.metrics import confusion_counts, scores_from_counts
 
 def parse_args():
     """
@@ -33,7 +33,8 @@ def parse_args():
     parser.add_argument("--optimizer", type=str, choices=list(OPTIMIZERS), default="rmsprop", help="Which optimizer to use during training")
     parser.add_argument("--dice_weight", type=float, default=0.0, help="Determines dice weight to be used for loss - cross-entropy plus dice weight multiplied by dice loss - 0 to disable dice loss")
     parser.add_argument("--epochs", type=int, default=100, help="Maximum number of epochs to train for (passes over the training set)")
-    parser.add_argument("--patience", type=int, default=7, help="How many epochs to continue training for without seeing improvement in validation loss")
+    parser.add_argument("--monitor", type=str, default="valid_loss", choices=["valid_loss", "sunlit_iou", "f1", "mean_iou", "precision"], help="Which metric to monitor during training for early stopping")
+    parser.add_argument("--patience", type=int, default=7, help="How many epochs to continue training for without seeing improvement in the monitored value")
     parser.add_argument("--batch_size", type=int, default=8, help="Number of images in each training / evaluation batch")
     parser.add_argument("--lr", type=float, default=1e-4, help="The learning rate of the model")
     parser.add_argument("--train_crop", nargs=2, type=int, default=[256, 480], help="The size of the random crop that is applied to training images (h x w)")
@@ -64,7 +65,7 @@ def main() -> None:
     with open(out_dir / "settings.json", "w") as file:
         json.dump(settings, file, indent=4, default=str)
 
-    # Build specified model
+    # Build specified modelargs.monitor
     model = build_model(args.architecture, num_classes=2)
     model = model.to("cuda")  # Move model to GPU
 
@@ -80,8 +81,11 @@ def main() -> None:
     optimizer = build_optimizer(args.optimizer, model.parameters(), args.lr)
     loss_fn = build_loss(args.dice_weight)
 
+    # Initialize best_value to negative infinity, we use a higher-is-better approach for monitoring model performance
+    # Loss will need to be negated during the training for this calculation
+    best_value = float("-inf")
+
     # Begin model training
-    best_valid_loss = float("inf")
     epochs_without_improvement = 0
     model.train()
     for epoch in range(args.epochs):
@@ -102,8 +106,17 @@ def main() -> None:
 
         tqdm.write(f"[TRAIN] Loss: {(total_train_loss / len(train_loader)):.4f}")
 
+        # Dictionary to store running totals
+        totals = {
+            "tp": 0,
+            "fp": 0,
+            "fn": 0,
+            "tn": 0,
+        }
+
         # Validation loop
         total_valid_loss = 0.0
+
         model.eval()
         with torch.no_grad():
             for images, masks in tqdm(valid_loader, desc=f"[VALID] Epoch {epoch + 1}"):
@@ -112,27 +125,46 @@ def main() -> None:
                 images = images.to("cuda")
                 masks = masks.to("cuda")
 
+                # Get model's predictions and calculate loss
                 logits = model(images)
+                predictions = logits.argmax(dim=1)
                 loss = loss_fn(logits, masks)
                 total_valid_loss += loss.item()
 
-        tqdm.write(f"[VALID] Loss: {(total_valid_loss / len(valid_loader)):.4f}")
+                # Get confusion counts, add to running total of each
+                current_conf = confusion_counts(predictions, masks)
+                for key in totals:
+                    totals[key] += current_conf[key]
 
-        # Check if we've gotten a better validation loss than our current best
-        if total_valid_loss < best_valid_loss:
-            # If we have a better validation loss update our current best, save the current weights, inform the user, and reset our patience counter
-            best_valid_loss = total_valid_loss
+        # Calculate scores for the current run
+        valid_loss = total_valid_loss / len(valid_loader)
+        scores = scores_from_counts(**totals)  # Unpacks the values from totals as arguments
+
+        results = {"valid_loss": valid_loss, **scores}
+        current_value = results[args.monitor]
+        if args.monitor == "valid_loss":
+            current_value = -current_value
+
+        tqdm.write(f"[VALID] Loss: {valid_loss:.4f}")
+        tqdm.write(f"[VALID] Sunlit IOU: {scores['sunlit_iou']:.4f}\tMean IOU: {scores['mean_iou']:.4f}")
+        tqdm.write(f"[VALID] Precision: {scores['precision']:.4f}\tAccuracy: {scores['accuracy']:.4f}")
+        tqdm.write(f"[VALID] Recall: {scores['recall']:.4f}\t\tF1: {scores['f1']:.4f}")
+
+        # Check if we've gotten a better score than our current best for the monitored value
+        if current_value > best_value:
+            # If we have a better score, update our current best, save the current weights, inform the user, and reset our patience counter
+            best_value = current_value
             torch.save(model.state_dict(), best_model_path)
             tqdm.write(f"[INFO]  Best model saved to: {best_model_path}")
             epochs_without_improvement = 0
         else:
             # Otherwise don't save the model, increment our patience counter and inform the user that the model hasn't improved
             epochs_without_improvement += 1
-            tqdm.write(f"[INFO]  Early stopping: {epochs_without_improvement} / {args.patience} epochs without improvement")
+            tqdm.write(f"[INFO]  Early stopping: {epochs_without_improvement} / {args.patience} epochs without improvement of {args.monitor}")
 
         # Break out of the epoch loop if we hit our patience limit
         if epochs_without_improvement >= args.patience:
-            tqdm.write(f"[INFO]  Validation loss has not improved in {args.patience} epochs - training stopped.")
+            tqdm.write(f"[INFO]  {args.monitor} has not improved in {args.patience} epochs - training stopped")
             break
 
         # Put the model back in training mode before the next iteration

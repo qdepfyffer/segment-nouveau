@@ -46,7 +46,7 @@ data_root/
 
 ## Getting Started
 
-*segment-nouveau is built and tested with python 3.11*
+*Segment-nouveau is built and tested with python 3.11*
 
 ### 1. Clone and enter the project
 
@@ -144,7 +144,6 @@ Checkpoints are saved to `checkpoints/crop/timestamp/architecture-best.pt` by de
 | `requirements.txt`       | Non-torch project requirements                                                          |
 | `requirements-torch.txt` | Torch-specific project requirements                                                     |
 | `train.py`               | Training logic and loop, this is what you run to train the models                       |
-
 
 
 ## Design decisions, or alternatively "Why would you rebuild a perfectly good* tool?"
