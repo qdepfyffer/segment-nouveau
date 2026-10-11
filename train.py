@@ -5,12 +5,11 @@ from pathlib import Path
 
 import torch
 from torch.utils.data import DataLoader
-from torchvision.models import MobileNet_V3_Large_Weights
-from torchvision.models.segmentation import deeplabv3_mobilenet_v3_large
 from tqdm import tqdm
 
 from dataset import SegmentationDataset
 from losses import cross_entropy_loss
+from models import build_model, MODELS
 from transforms import training_transform, PadToSize
 
 
@@ -18,6 +17,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Train a semantic segmentation model")
     parser.add_argument("--data_root", type=Path, required=True, help="Root dataset directory, should have a subdirectory for the crop you want to train on")
     parser.add_argument("--crop", type=str, required=True, help="The crop (name of subdirectory within the dataset root directory) you want to train on")
+    parser.add_argument("--architecture", type=str, choices=list(MODELS), default="deeplabv3", help="Which model to train")
     parser.add_argument("--epochs", type=int, default=10, help="Maximum number of epochs to train for (passes over the training set)")
     parser.add_argument("--patience", type=int, default=7, help="How many epochs to continue training for without seeing improvement")
     parser.add_argument("--batch_size", type=int, default=8, help="Number of images in each training / evaluation batch")
@@ -45,12 +45,8 @@ def main() -> None:
     with open(out_dir / "settings.json", "w") as file:
         json.dump(settings, file, indent=2, default=str)
 
-    # Build the default model
-    model = deeplabv3_mobilenet_v3_large(
-        weights=None,
-        weights_backbone=MobileNet_V3_Large_Weights.DEFAULT,
-        num_classes=2
-    )
+    # Build specified model
+    model = build_model(args.architecture, num_classes=2)
 
     # Move model to the GPU
     model = model.to("cuda")
@@ -82,8 +78,7 @@ def main() -> None:
             images = images.to("cuda")
             masks = masks.to("cuda")
 
-            output = model(images)
-            logits = output["out"]
+            logits = model(images)
             optimizer.zero_grad()
             loss = loss_fn(logits, masks)
             loss.backward()
@@ -102,8 +97,7 @@ def main() -> None:
                 images = images.to("cuda")
                 masks = masks.to("cuda")
 
-                output = model(images)
-                logits = output["out"]
+                logits = model(images)
                 loss = loss_fn(logits, masks)
                 total_valid_loss += loss.item()
 
@@ -113,8 +107,8 @@ def main() -> None:
         if total_valid_loss < best_valid_loss:
             # If we have a better validation loss update our current best, save the current weights, inform the user, and reset our patience counter
             best_valid_loss = total_valid_loss
-            torch.save(model.state_dict(), out_dir / "best.pt")
-            tqdm.write(f"[INFO]  Best model saved to: {out_dir / 'best.pt'}")
+            torch.save(model.state_dict(), out_dir / f"{args.architecture}-best.pt")
+            tqdm.write(f"[INFO]  Best model saved to: {out_dir / f'{args.architecture}-best.pt'}")
             epochs_without_improvement = 0
         else:
             # Otherwise don't save the model, increment our patience counter and inform the user that the model hasn't improved
