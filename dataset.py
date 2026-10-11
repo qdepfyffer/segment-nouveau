@@ -7,9 +7,9 @@ from torch.utils.data import Dataset
 from torchvision import tv_tensors
 from torchvision.transforms.v2 import functional as F
 
-# All of our datasets use this convention so having a per-folder designation just adds more room for user error
-# If that convention ever changes we can add the same per-folder lookup for classes
-classes = [("Non-sunlit leaf",(165, 42, 42)),
+# No class_dict.csv - class designations live here (for now at least)
+# The classes' position in the list is its class ID - Here, sunlit = 1.
+classes = [("Non-sunlit",(165, 42, 42)),
            ("Sunlit leaf",(0, 255, 0))]
 
 # Value of pixels that should be ignored (255 by default) - don't confuse this with the (0, 255, 0) green for sunlit pixels
@@ -26,7 +26,7 @@ def _load_mask(label_path: Path) -> np.ndarray:
     # Open the label as an RGB image
     img = np.array(Image.open(label_path).convert("RGB"))
 
-    # Create the mask that the model will actually see
+    # Create the mask, where every pixel is initially "unassigned" / "ignored"
     mask = np.full(img.shape[:2], IGNORE_INDEX, dtype=np.uint8)
 
     # Calculate mask
@@ -39,7 +39,7 @@ def _load_mask(label_path: Path) -> np.ndarray:
     # If any "pixels" in the mask still have the value 255, your label image has unexpected colors.
     if (mask == IGNORE_INDEX).any():
         raise RuntimeError(
-            f"Mask for {label_path} has values outside of expected range. Please check the label image.")
+            f"Mask for {label_path} contains a color that doesn't belong to any class. Please check the label image.")
 
     # If we didn't error out we can return the mask, it's now a label_h x label_w ndarray of 0s and 1s
     return mask
@@ -51,7 +51,7 @@ def _find_pairs(data_root: Path, crop: str, split: str) -> list[tuple[Path, Path
     :param data_root:   Root directory containing the dataset, should have a subfolder for each crop - See README.md for expected folder structure
     :param crop:        The crop that the dataset contains (e.g. almond, citrus, grape, pistachio, tomato)
     :param split:       The split that is being searched (test, train, or valid)
-    :return:            A list of tuples containing pairs of visual images and their paired labelsR
+    :return:            A list of tuples containing pairs of visual images and their paired labels
     """
 
     pairs = []
@@ -66,7 +66,7 @@ def _find_pairs(data_root: Path, crop: str, split: str) -> list[tuple[Path, Path
 
     vis_imgs = sorted(vis_dir.glob("*.jpg"))  # Get sorted list of images from the visual image directory
 
-    # Now we need to find the labels to match the visual imagesTrue
+    # Now we need to find the labels to match the visual images
     # Expected convention for label filenames: *vis_img_stem*_L.png
     for file in vis_imgs:
         stem = file.stem
@@ -92,7 +92,7 @@ class SegmentationDataset(Dataset):
         :param data_root:   Root directory containing the dataset, should have a subfolder for each crop - See README.md for expected folder structure
         :param crop:        The specific crop being considered (e.g. almond, citrus, grape, pistachio, tomato)
         :param split:       The split that is being considered (test, train, or valid)
-        :param transform:   What transform, if any, should be applied to the images
+        :param transform:   What transform, if any, should be applied to the images and masks - Must accept both image and mask, and return both image and mask
         :return:            None
         """
         # Store the list of pairs found for our dataset
@@ -109,7 +109,7 @@ class SegmentationDataset(Dataset):
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
         """
         :param idx: Index of the item being fetched
-        :return:    A tuple of PyTorch tensors representing (visual_image, mask_image) with any optional transforms applied
+        :return:    A tuple of PyTorch tensors representing (visual_image, mask_image) with any optional transforms applied - visual_image: float32, shape=[3, h, w]; mask: int64, shape=[h, w], holds class IDs, 255 = ignored
         """
         # Get the pair from self.pairs at idx and store the paths to the visual and label images
         item = self.pairs[idx]
@@ -126,7 +126,7 @@ class SegmentationDataset(Dataset):
         mask = torch.from_numpy(mask).long()
         mask = tv_tensors.Mask(mask)
 
-        # Make sure the images and the labels are the same size. The old tools stretched both so this wasn't an issue.
+        # Make sure the images and the labels are the same size. The old segment-main pipeline resized both to 512x512, which hid any potential mismatches
         if mask.shape != vis_img.shape[1:]:
             raise ValueError(f"Mask {lbl_path.stem} of size {mask.shape} does not match image {vis_path.stem} of size {vis_img.shape[1:]}")
 

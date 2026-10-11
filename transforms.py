@@ -6,10 +6,10 @@ from torchvision.transforms.v2 import functional as F
 from dataset import IGNORE_INDEX
 
 
-# This is only to change what the model is seeing during training epochs
 def training_transform(height: int, width: int) -> v2.Compose:
     """
     Optional training transform for the dataset - crops a random static sized window from the image and randomly mirrors it horizontally w/ p=0.5
+    Images smaller than the crop are padded before being cropped
     :param height:  Height of the random crop
     :param width:   Width of the random crop
     :return:        Composed transform - random crop and 50% chance to mirror horizontally
@@ -23,8 +23,9 @@ def training_transform(height: int, width: int) -> v2.Compose:
     ])
 
 
-# Images in test / valid splits should not recieve the random cropping, but for some reason our tomato dataset is not consistent
-# They vary in height (284 ~ 288), so we need a way to make sure the model is getting consistently sized images, that is what this transform is for
+# Images in test / valid splits should not receive the random cropping, but they might need to be padded (padding goes on the right & on the bottom)
+# The sizes of images in our tomato dataset is inconsistent (due to trimming that happened during the original extraction of the RGB images)
+# They vary in height (284 ~ 288), this transform lets us ensure that every image in a batch comes out to the same size
 class PadToSize:
 
     def __init__(self, height: int, width: int) -> None:
@@ -32,6 +33,12 @@ class PadToSize:
         self.width = width
 
     def __call__(self, image: torch.Tensor, mask: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        Pads the right and bottom of a pair of tensors which represent a visual image and a mask
+        :param image:   The tensor storing the image
+        :param mask:    The tensor storing the mask
+        :return:        The two tensors, now padded on the right and bottom, as a tuple
+        """
         # Calculate the number of pixels needed to pad the image to the desired dimensions
         missing_h = self.height - image.shape[-2]
         missing_w = self.width - image.shape[-1]
