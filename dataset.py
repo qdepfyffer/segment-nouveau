@@ -1,15 +1,19 @@
+from pathlib import Path
+
 import numpy as np
 import torch
-from pathlib import Path
 from PIL import Image
 from torch.utils.data import Dataset
-from torchvision.transforms.v2 import functional as F
 from torchvision import tv_tensors
+from torchvision.transforms.v2 import functional as F
 
 # All of our datasets use this convention so having a per-folder designation just adds more room for user error
 # If that convention ever changes we can add the same per-folder lookup for classes
 classes = [("Non-sunlit leaf",(165, 42, 42)),
            ("Sunlit leaf",(0, 255, 0))]
+
+# Value of pixels that should be ignored (255 by default) - don't confuse this with the (0, 255, 0) green for sunlit pixels
+IGNORE_INDEX = 255
 
 
 def _load_mask(label_path: Path) -> np.ndarray:
@@ -23,7 +27,7 @@ def _load_mask(label_path: Path) -> np.ndarray:
     img = np.array(Image.open(label_path).convert("RGB"))
 
     # Create the mask that the model will actually see
-    mask = np.full(img.shape[:2], 255, dtype=np.uint8)
+    mask = np.full(img.shape[:2], IGNORE_INDEX, dtype=np.uint8)
 
     # Calculate mask
     for cls_idx, cls in enumerate(classes):
@@ -33,7 +37,7 @@ def _load_mask(label_path: Path) -> np.ndarray:
         mask[matches] = cls_idx
 
     # If any "pixels" in the mask still have the value 255, your label image has unexpected colors.
-    if (mask == 255).any():
+    if (mask == IGNORE_INDEX).any():
         raise RuntimeError(
             f"Mask for {label_path} has values outside of expected range. Please check the label image.")
 
@@ -62,7 +66,7 @@ def _find_pairs(data_root: Path, crop: str, split: str) -> list[tuple[Path, Path
 
     vis_imgs = sorted(vis_dir.glob("*.jpg"))  # Get sorted list of images from the visual image directory
 
-    # Now we need to find the labels to match the visual images
+    # Now we need to find the labels to match the visual imagesTrue
     # Expected convention for label filenames: *vis_img_stem*_L.png
     for file in vis_imgs:
         stem = file.stem
