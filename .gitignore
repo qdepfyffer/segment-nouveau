@@ -1,4 +1,5 @@
 .idea/
 .ignore/
 __pycache__/
-runs/
+checkpoints/
+eval/

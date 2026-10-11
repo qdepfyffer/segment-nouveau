@@ -1,3 +1,10 @@
+"""
+ADDING A NEW TRANSFORM:
+Transforms can be added here and then imported wherever you're using them. They should accept both an image and a mask,
+they need to transform the image and mask in EXACTLY the same way (besides any padding, see example in
+training_transform), and they need to return the image and the mask
+"""
+
 import torch
 from torchvision import tv_tensors
 from torchvision.transforms import v2
@@ -23,10 +30,14 @@ def training_transform(height: int, width: int) -> v2.Compose:
     ])
 
 
-# Images in test / valid splits should not receive the random cropping, but they might need to be padded (padding goes on the right & on the bottom)
-# The sizes of images in our tomato dataset is inconsistent (due to trimming that happened during the original extraction of the RGB images)
-# They vary in height (284 ~ 288), this transform lets us ensure that every image in a batch comes out to the same size
+
 class PadToSize:
+    """
+    Images in test / valid splits should not receive the random cropping, but they might need to be padded (padding goes on the right & on the bottom)
+    The sizes of images in our tomato dataset is inconsistent (due to trimming that happened during the original extraction of the RGB images)
+    They vary in height (284 ~ 288), this transform lets us ensure that every image in a batch comes out to the same size
+    """
+
 
     def __init__(self, height: int, width: int) -> None:
         self.height = height

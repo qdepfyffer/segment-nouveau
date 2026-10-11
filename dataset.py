@@ -85,6 +85,19 @@ def _find_pairs(data_root: Path, crop: str, split: str) -> list[tuple[Path, Path
 
 # Build the PyTorch Dataset class
 class SegmentationDataset(Dataset):
+    """
+    Numbered list of examples for one crop and split. Each example holds the paths to an image and its mask. No pictures
+    are held in memory, they are only loaded when they are requested, like via ds[i]. Loaded examples are represented as
+    two tensors, and they are guaranteed to be the same size. Masks are also guaranteed to only contain class IDs and a
+    padding value, 255 by default, represented by IGNORE_INDEX. If the optional transform is supplied, it will be
+    applied to both the image AND its mask uniformly. A PyTorch DataLoader should do the asking and stacking of results
+    into batches.
+
+
+    Example usage:
+    ds = SegmentationDataset(data_root, "tomato", "train", transform=training_transform(256, 480))
+    image, mask = ds[0]
+    """
 
     def __init__(self, data_root: Path, crop: str, split: str, transform=None) -> None:
         """
