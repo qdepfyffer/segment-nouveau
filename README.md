@@ -141,23 +141,25 @@ Checkpoints are saved to `checkpoints/crop/timestamp/architecture-best.pt` by de
 
 **Example usage**: `python evaluate.py --checkpoint checkpoints/tomato/2026-10-11_07-48-57/ --crop tomato --split test`
 
-Evaluation results are saved to `eval/checkpoint/<crop>-<split>.json` by default, where "crop" represents the evaluated dataset and "split" the evaluated split.
+Evaluation results are saved to `eval/<run folder name>/<crop>-<split>.json` by default, where "crop" represents the evaluated dataset and "split" the evaluated split.
 
 ### Command line arguments (Evaluation)
 
-| Argument       | Description                                                                                                                | Example                                    |
-|----------------|----------------------------------------------------------------------------------------------------------------------------|--------------------------------------------|
-| `--checkpoint` | Path to the folder containing the desired checkpoint and settings.json                                                     | `checkpoints/tomato/2026-10-11_07-48-57//` |
-| `--crop`       | The crop (name of subdirectory within the dataset root directory) you want to use in evaluation                            | `tomato`                                   |
-| `--split`      | The split the model should consider for evaluation                                                                         | `test`                                     |
-| `--output_dir` | The folder this script should output to                                                                                    | `eval/`                                    |
-| `--data_root`  | Root dataset directory override, for when the data_root in the model's settings.json does not exist on the current machine | `/home/ciwa-full-split/`                   |
+| Argument       | Description                                                                                                                | Example                                   |
+|----------------|----------------------------------------------------------------------------------------------------------------------------|-------------------------------------------|
+| `--checkpoint` | Path to the folder containing the desired checkpoint and settings.json                                                     | `checkpoints/tomato/2026-10-11_07-48-57/` |
+| `--crop`       | The crop (name of subdirectory within the dataset root directory) you want to use in evaluation                            | `tomato`                                  |
+| `--split`      | The split the model should consider for evaluation                                                                         | `test`                                    |
+| `--output_dir` | The folder this script should output to                                                                                    | `eval/`                                   |
+| `--data_root`  | Root dataset directory override, for when the data_root in the model's settings.json does not exist on the current machine | `/home/ciwa-full-split/`                  |
 
 ## Extending the suite
 
 ### Adding a new model
 
 *See `models/__init__.py`*
+
+After adding and training a new model, run `python -m tools.check_sizing --checkpoint <run folder> --crop <crop>` for each crop you plan to report
 
 ### Adding a new loss function
 
@@ -180,10 +182,14 @@ Evaluation results are saved to `eval/checkpoint/<crop>-<split>.json` by default
 | `metrics.py`             | Functions needed for the evaluation and scoring of models                                                             |
 | `optimizers.py`          | Builder and implementations for the optimizers used during model training                                             |
 | `transforms.py`          | Builder and implementations for any transforms used during model training or evaluation                               |
-| `models/`                | `__init__.py`, `deeplabv3.py`                                                                                         |
+| `models/`                | `__init__.py`, `deeplabv3.py`, `sizing.py`                                                                            |
 | `__init__.py`            | Dictionary of available models and a model builder function                                                           |
 | `deeplabv3.py`           | Implementation of the DeepLabV3 model with a MobileNetV3 backbone                                                     |
 | `sizing.py`              | Function to pad a batch of images on the right/bottom via reflection so height and width cleanly divide by `multiple` |
+| `tools/`                 | `__init__.py`, `check_env.py`, `check_sizing.py`                                                                      |
+| `__init__.py`            | Empty                                                                                                                 |
+| `check_env.py`           | Script to run a few commands to validate installation of PyTorch                                                      |
+| `check_sizing.py`        | Script to check whether or not a model's sizing is set correctly, and whether it can tolerate black padding           |
 | `dataset.py`             | Finds images and their corresponding labels, loads them, ensures they match                                           |
 | `evaluate.py`            | Evaluation logic and loop, this is what you run to evaluate the models                                                |
 | `README.md`              | What you're reading now.                                                                                              |
@@ -191,11 +197,10 @@ Evaluation results are saved to `eval/checkpoint/<crop>-<split>.json` by default
 | `requirements-torch.txt` | Torch-specific project requirements                                                                                   |
 | `train.py`               | Training logic and loop, this is what you run to train the models                                                     |
 
-
 ## Design decisions, or alternatively "Why would you rebuild a perfectly good* tool?"
 
  - Images are never stretched. If models expect inputs to have a specific aspect ratio, we instead take a randomly cropped window from our full images, so that the model isn't learning from a distorted view of our data. This follows the approach of the suite used in the earlier papers.
- - During training images are padded out to clean multiples of a size specified by the model implementation. This padding uses mirroring rather than black pixels. Never pad with black.
+ - When a model is run, images are padded out to clean multiples of a size specified by the model implementation. This padding uses mirroring rather than black pixels. Never pad with black. With the default training crop behavior, this only affects validation and testing
  - Validation images handled with a batch size of 1. This is to allow for the differently sized images within the tomato dataset. Previous implementations stretched everything to 512x512, so never had batches of mixed sizes.
  - This suite works out of the box with the canonical CIWA+ dataset. You shouldn't have to reorganize any files. If you still want to use the old dataset layout from the other repos, I plan to add support for that eventually.
  - No need for per-dataset files containing classes. It was the same file in every dataset, so the class specifications now live at the top of dataset.py. I can add support for a per-dataset `.csv` file later, which would override any hard-coded class specifications.

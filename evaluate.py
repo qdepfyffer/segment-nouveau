@@ -31,37 +31,40 @@ def parse_args():
     parser.add_argument("--data_root", type=Path, default=None, help="Optional dataset root override")
     return parser.parse_args()
 
-def main():
-    # Grab new command line arguments
-    args = parse_args()
-
+# The below functions were pulled out so they could be imported and reused elsewhere because they implement a pattern that gets repeated in other files
+def load_checkpoint(checkpoint_dir: Path):
+    """
+    Reads settings.json from a checkpoint's folder and rebuilds the model by loading the saved weights
+    :param checkpoint_dir:  Directory holding the checkpoint and the settings.json that resulted in that set of weights
+    :return:                The rebuilt model and its settings dictionary
+    """
     # Load saved settings
-    settings_path = args.checkpoint / "settings.json"
+    settings_path = checkpoint_dir / "settings.json"
     with open(settings_path) as file:
         settings = json.load(file)
 
-    # Determine output directory
-    out_dir = args.output_dir / args.checkpoint.name
-    out_dir.mkdir(parents=True, exist_ok=True)
-    eval_path = out_dir / f"{args.crop}-{args.split}.json"
-
     # Get path to checkpoints & raise an error if they can't be found
-    checkpoint_path = args.checkpoint / f"{settings['architecture']}-best.pt"
+    checkpoint_path = checkpoint_dir / f"{settings['architecture']}-best.pt"
     if not checkpoint_path.is_file():
         # We should only end up here if the checkpoints are missing but the settings aren't, which shouldn't ever happen
         raise FileNotFoundError(f"Model checkpoint could not be found at {checkpoint_path}. Please double check and try again.")
 
-    # Build the model based on saved settings, move it to GPU, and put it in evaluation mode
+    # Build the model based on saved settings, move it to GPU
     model = build_model(settings["architecture"], num_classes=2)  # CIWA+ only uses 2 classes
     model.load_state_dict(torch.load(checkpoint_path, weights_only=True))  # We only load the weights for safety
     model.to("cuda")
     model.eval()
 
-    # Load and build scoring dataset (batch size 1 lets us score every image at native resolution)
-    dataset_root = Path(settings["data_root"]) if args.data_root is None else args.data_root
-    eval_ds = SegmentationDataset(dataset_root, args.crop, args.split)
-    eval_loader = DataLoader(eval_ds, batch_size=1)
+    return model, settings
 
+def count_split(model, loader, prepare=None):
+    """
+    Runs the model on every image in the loader and returns summed tp/fp/fn/tn counts
+    :param model:   The model to be run
+    :param loader:  The DataLoader that will feed the model
+    :param prepare: Optional function that gets applied to each image batch before being passed to the model (leave as None if you aren't absolutely sure you want something here)
+    :return:        A dictionary holding summed tp/fp/fn/tn counts
+    """
     # Dictionary to store running totals
     totals = {
         "tp": 0,
@@ -72,19 +75,47 @@ def main():
 
     # Begin evaluation
     with torch.no_grad():
-        for images, masks in tqdm(eval_loader, desc=f"[EVAL]  {args.split}"):
+        for images, masks in tqdm(loader, desc="[EVAL]  Progress"):
             # Put images and masks on GPU
             images = images.to("cuda")
             masks = masks.to("cuda")
+            height, width = masks.shape[-2:]
+
+            if prepare is not None:
+                images = prepare(images)
 
             # Run the model and get concrete predictions
-            logits = model(images)
-            predictions = logits.argmax(dim=1)
+            predictions = model(images).argmax(dim=1)[..., :height, :width]
 
-            # Get confusion counts, add to running total of each
+            # Get confusion counts, add to running total of each - see components/metrics.py for implementation
             current_conf = confusion_counts(predictions, masks)
             for key in totals:
                 totals[key] += current_conf[key]
+
+    return totals
+
+
+def main():
+    # Grab new command line arguments
+    args = parse_args()
+
+    # Determine output directory
+    if not args.checkpoint.is_dir():
+        raise FileNotFoundError(f"{args.checkpoint} could not be found. Please check the spelling and try again.")
+    out_dir = args.output_dir / args.checkpoint.name
+    out_dir.mkdir(parents=True, exist_ok=True)
+    eval_path = out_dir / f"{args.crop}-{args.split}.json"
+
+    # Load model and settings (it's already in eval mode from load_checkpoint)
+    model, settings = load_checkpoint(args.checkpoint)
+
+    # Load and build scoring dataset (batch size 1 lets us score every image at native resolution)
+    dataset_root = Path(settings["data_root"]) if args.data_root is None else args.data_root
+    eval_ds = SegmentationDataset(dataset_root, args.crop, args.split)
+    eval_loader = DataLoader(eval_ds, batch_size=1)
+
+    # Calculate total tp/fp/fn/tn counts
+    totals = count_split(model, eval_loader)
 
     # Score the model once with totals
     # By default models are scored at native label resolution with no crop or resize
