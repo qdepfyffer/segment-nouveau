@@ -102,7 +102,7 @@ pip install -r requirements.txt
 
 **Example usage**: `python train.py --data_root path/to/dataset --crop tomato --epochs 100 --patience 7 --batch_size 8 --lr 1e-4`
 
-Checkpoints are saved to `checkpoints/crop/timestamp/architecture-best.pt` by default, along with the `settings.json` that was used to produce them.
+Checkpoints are saved to `checkpoints/crop/timestamp/architecture-best.pt` by default, along with the `settings.json` that was used to produce them and the `history.json` that accompanied their training.
 
 ### Command line arguments (Training)
 

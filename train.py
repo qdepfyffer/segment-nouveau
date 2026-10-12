@@ -83,6 +83,9 @@ def main() -> None:
     # Loss will need to be negated during the training for this calculation
     best_value = float("-inf")
 
+    # Initialize history as an empty list so we can track the model's scores and plot training curves later
+    history = []
+
     # Begin model training
     epochs_without_improvement = 0
     model.train()
@@ -102,7 +105,8 @@ def main() -> None:
             optimizer.step()
             total_train_loss += loss.item()
 
-        tqdm.write(f"[TRAIN] Loss: {(total_train_loss / len(train_loader)):.4f}")
+        train_loss = total_train_loss / len(train_loader)
+        tqdm.write(f"[TRAIN] Loss: {train_loss:.4f}")
 
         # Dictionary to store running totals
         totals = {
@@ -134,11 +138,22 @@ def main() -> None:
                 for key in totals:
                     totals[key] += current_conf[key]
 
-        # Calculate scores for the current run
+        # Calculate scores for the current run and store the results
         valid_loss = total_valid_loss / len(valid_loader)
         scores = scores_from_counts(**totals)  # Unpacks the values from totals as arguments
-
         results = {"valid_loss": valid_loss, **scores}
+
+        # Append our results to the history and write our history to the history file
+        history.append({
+            "epoch": epoch + 1,
+            "train_loss": train_loss,
+            **results,
+        })
+
+        with open(out_dir / "history.json", "w") as file:
+            json.dump(history, file, indent=4)
+
+        # Get the current value for our monitored metric and invert it if we're monitoring loss (we need higher = better)
         current_value = results[args.monitor]
         if args.monitor == "valid_loss":
             current_value = -current_value
