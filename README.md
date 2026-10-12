@@ -98,6 +98,20 @@ pip install -r requirements-torch.txt
 pip install -r requirements.txt
 ```
 
+### 4. Verify torch installation
+
+```bash
+python -m tools.check_env
+```
+Running the above command should print something like:
+```
+Torch version: 2.14.1+cu126
+CUDA Available: True
+Torch CUDA version: 12.6
+CUDA device: NVIDIA GeForce RTX 3080
+Tensor sum: 12.0
+```
+
 ## Training a model
 
 **Example usage**: `python train.py --data_root path/to/dataset --crop tomato --epochs 100 --patience 7 --batch_size 8 --lr 1e-4`
