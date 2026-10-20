@@ -1,0 +1,19 @@
+defaults:
+  - crop: ???
+  - model: deeplabv3
+  - _self_
+
+data_root: ???          # Root dataset directory
+optimizer: rmsprop      # Which optimizer to use
+dice_weight: 0.0        # Weight to be used for dice loss
+epochs: 100             # Maximum number of epochs to train for
+monitor: valid_loss     # What metric to measure for early stopping of training
+patience: 7             # How many epochs to continue training for without improvement in the monitored metric
+batch_size: 8           # Number of images in each training batch
+lr: 1e-4                # Learning rate for the current training session
+output_dir: checkpoints # Where train.py should output to
+seed: 42                # Random seed for the training process
+
+hydra:
+  run:
+    dir: ${output_dir}/${crop.name}/${now:%Y-%m-%d_%H-%M-%S}

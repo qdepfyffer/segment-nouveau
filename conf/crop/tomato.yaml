@@ -1,0 +1,2 @@
+name: tomato            # Name of the crop being used in training
+train_crop: [256, 480]  # Height, width of the random training crop (images in the CIWA+ tomato dataset are 504 × 284–288)

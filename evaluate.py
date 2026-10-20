@@ -44,13 +44,13 @@ def load_checkpoint(checkpoint_dir: Path):
         settings = json.load(file)
 
     # Get path to checkpoints & raise an error if they can't be found
-    checkpoint_path = checkpoint_dir / f"{settings['architecture']}-best.pt"
+    checkpoint_path = checkpoint_dir / f"{settings['model']['name']}-best.pt"
     if not checkpoint_path.is_file():
         # We should only end up here if the checkpoints are missing but the settings aren't, which shouldn't ever happen
         raise FileNotFoundError(f"Model checkpoint could not be found at {checkpoint_path}. Please double check and try again.")
 
     # Build the model based on saved settings, move it to GPU
-    model = build_model(settings["architecture"], num_classes=2)  # CIWA+ only uses 2 classes
+    model = build_model(settings["model"]["name"], num_classes=2)  # CIWA+ only uses 2 classes
     model.load_state_dict(torch.load(checkpoint_path, weights_only=True))  # We only load the weights for safety
     model.to("cuda")
     model.eval()

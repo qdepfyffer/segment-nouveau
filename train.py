@@ -2,12 +2,14 @@
 Script for the training of segmentation models
 """
 
-import argparse
 import json
 from datetime import datetime
 from pathlib import Path
 
+import hydra
 import torch
+from hydra.core.hydra_config import HydraConfig
+from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -18,66 +20,45 @@ from dataset import SegmentationDataset
 from models import build_model, MODELS
 from components.metrics import confusion_counts, scores_from_counts
 
-def parse_args():
-    """
-    Contains all the command line arguments used in training with reasonable defaults for any that aren't explicitly required.
-    :return: Command line arguments to be used in model training
-    """
-    parser = argparse.ArgumentParser(
-        description="Train a semantic segmentation model",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
-    parser.add_argument("--data_root", type=Path, required=True, help="Root dataset directory, should have a subdirectory for the crop you want to train on")
-    parser.add_argument("--crop", type=str, required=True, help="The crop (name of subdirectory within the dataset root directory) you want to train on")
-    parser.add_argument("--architecture", type=str, choices=list(MODELS), default="deeplabv3", help="Which model to train")
-    parser.add_argument("--optimizer", type=str, choices=list(OPTIMIZERS), default="rmsprop", help="Which optimizer to use during training")
-    parser.add_argument("--dice_weight", type=float, default=0.0, help="Determines dice weight to be used for loss - cross-entropy plus dice weight multiplied by dice loss - 0 to disable dice loss")
-    parser.add_argument("--epochs", type=int, default=100, help="Maximum number of epochs to train for (passes over the training set)")
-    parser.add_argument("--monitor", type=str, default="valid_loss", choices=["valid_loss", "sunlit_iou", "f1", "mean_iou", "precision"], help="Which metric to monitor during training for early stopping and determining the best model to save")
-    parser.add_argument("--patience", type=int, default=7, help="How many epochs to continue training for without seeing improvement in the monitored value")
-    parser.add_argument("--batch_size", type=int, default=8, help="Number of images in each training batch")
-    parser.add_argument("--lr", type=float, default=1e-4, help="The learning rate of the model")
-    parser.add_argument("--train_crop", nargs=2, type=int, default=[256, 480], help="The size of the random crop that is applied to training images (h x w)")
-    parser.add_argument("--output_dir", type=Path, default=Path("checkpoints"), help="The folder this script should output to")
-    parser.add_argument("--seed", type=int, default=42, help="Number to use as a random seed for anything that can be seeded")
-    return parser.parse_args()
 
-def main() -> None:
+@hydra.main(config_path="conf", config_name="train", version_base="1.3")
+def main(cfg: DictConfig) -> None:
     """
     This is where the training loop lives.
     :return: None
     """
-    # Get command line args
-    args = parse_args()
+
+    # Make sure a valid monitor argument has been passed
+    MONITORS = ["valid_loss", "sunlit_iou", "f1", "mean_iou", "precision"]
+    if cfg.monitor not in MONITORS:
+        raise ValueError(f"{cfg.monitor} not found in list of valid monitors: " + " ".join(MONITORS))
 
     # Use our RNG seed
-    torch.manual_seed(args.seed)
+    torch.manual_seed(cfg.seed)
 
     # Determine output directory
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    out_dir = args.output_dir / args.crop / timestamp
-    out_dir.mkdir(parents=True)
-    best_model_path = out_dir / f"{args.architecture}-best.pt"
+    out_dir = Path(HydraConfig.get().runtime.output_dir)
+    best_model_path = out_dir / f"{cfg.model.name}-best.pt"
 
     # Save settings (passed args) to aid in reproducibility
-    settings = vars(args)
+    settings = OmegaConf.to_container(cfg, resolve=True)
     with open(out_dir / "settings.json", "w") as file:
         json.dump(settings, file, indent=4, default=str)
 
     # Build specified model
-    model = build_model(args.architecture, num_classes=2)
+    model = build_model(cfg.model.name, num_classes=2)
     model = model.to("cuda")  # Move model to GPU
 
     # Load our datasets
-    train_ds = SegmentationDataset(args.data_root, args.crop, "train",
-                                   transform=training_transform(args.train_crop[0], args.train_crop[1]))
-    valid_ds = SegmentationDataset(args.data_root, args.crop, "valid")
-    train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, drop_last=True)
+    train_ds = SegmentationDataset(Path(cfg.data_root), cfg.crop.name, "train",
+                                   transform=training_transform(cfg.crop.train_crop[0], cfg.crop.train_crop[1]))
+    valid_ds = SegmentationDataset(Path(cfg.data_root), cfg.crop.name, "valid")
+    train_loader = DataLoader(train_ds, batch_size=cfg.batch_size, shuffle=True, drop_last=True)
     valid_loader = DataLoader(valid_ds, batch_size=1)  # Validate with a batch size of 1 so images don't need to be the same size
 
     # Set optimizer and loss function
-    optimizer = build_optimizer(args.optimizer, model.parameters(), args.lr)
-    loss_fn = build_loss(args.dice_weight)
+    optimizer = build_optimizer(cfg.optimizer, model.parameters(), cfg.lr)
+    loss_fn = build_loss(cfg.dice_weight)
 
     # Initialize best_value to negative infinity, we use a higher-is-better approach for monitoring model performance
     # Loss will need to be negated during the training for this calculation
@@ -89,7 +70,7 @@ def main() -> None:
     # Begin model training
     epochs_without_improvement = 0
     model.train()
-    for epoch in range(args.epochs):
+    for epoch in range(cfg.epochs):
         # Training loop
         total_train_loss = 0.0
         for images, masks in tqdm(train_loader, desc=f"[TRAIN] Epoch {epoch + 1}"):
@@ -154,8 +135,8 @@ def main() -> None:
             json.dump(history, file, indent=4)
 
         # Get the current value for our monitored metric and invert it if we're monitoring loss (we need higher = better)
-        current_value = results[args.monitor]
-        if args.monitor == "valid_loss":
+        current_value = results[cfg.monitor]
+        if cfg.monitor == "valid_loss":
             current_value = -current_value
 
         tqdm.write(f"[VALID] Loss: {valid_loss:.4f}")
@@ -173,11 +154,11 @@ def main() -> None:
         else:
             # Otherwise don't save the model, increment our patience counter and inform the user that the model hasn't improved
             epochs_without_improvement += 1
-            tqdm.write(f"[INFO]  Early stopping: {epochs_without_improvement} / {args.patience} epochs without improvement of {args.monitor}")
+            tqdm.write(f"[INFO]  Early stopping: {epochs_without_improvement} / {cfg.patience} epochs without improvement of {cfg.monitor}")
 
         # Break out of the epoch loop if we hit our patience limit
-        if epochs_without_improvement >= args.patience:
-            tqdm.write(f"[INFO]  {args.monitor} has not improved in {args.patience} epochs - training stopped")
+        if epochs_without_improvement >= cfg.patience:
+            tqdm.write(f"[INFO]  {cfg.monitor} has not improved in {cfg.patience} epochs - training stopped")
             break
 
         # Put the model back in training mode before the next iteration
