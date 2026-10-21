@@ -1,5 +1,25 @@
+# Environment
+.env
+.venv/
+
+# JetBrains
 .idea/
+
+# Misc
 .ignore/
-__pycache__/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Outputs
 checkpoints/
-eval/
+outputs/
+multirun/
+
+# Python
+__pycache__
+
+# VSCode
+.vscode/
+.settings/

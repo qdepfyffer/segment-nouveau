@@ -1,0 +1,14 @@
+defaults:
+  - crop: ???     # The crop to evaluate
+  - _self_
+
+checkpoint: ???   # Training run folder - holds .hydra/ and <model>-best.pt
+split: test       # train, valid or test
+data_root: null   # null = use the data_root the model was trained with
+
+hydra:
+  run:
+    dir: ${checkpoint}/eval/${crop.name}-${split}
+  sweep:
+    dir: ${checkpoint}/eval
+    subdir: ${crop.name}-${split}

@@ -3,21 +3,20 @@ Script for the training of segmentation models
 """
 
 import json
-from datetime import datetime
 from pathlib import Path
 
 import hydra
 import torch
 from hydra.core.hydra_config import HydraConfig
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from components.losses import build_loss
-from components.optimizers import build_optimizer, OPTIMIZERS
+from components.optimizers import build_optimizer
 from components.transforms import training_transform
 from dataset import SegmentationDataset
-from models import build_model, MODELS
+from models import build_model
 from components.metrics import confusion_counts, scores_from_counts
 
 
@@ -39,11 +38,6 @@ def main(cfg: DictConfig) -> None:
     # Determine output directory
     out_dir = Path(HydraConfig.get().runtime.output_dir)
     best_model_path = out_dir / f"{cfg.model.name}-best.pt"
-
-    # Save settings (passed args) to aid in reproducibility
-    settings = OmegaConf.to_container(cfg, resolve=True)
-    with open(out_dir / "settings.json", "w") as file:
-        json.dump(settings, file, indent=4, default=str)
 
     # Build specified model
     model = build_model(cfg.model.name, num_classes=2)
