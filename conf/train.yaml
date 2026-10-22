@@ -1,5 +1,5 @@
 defaults:
-  - crop: ???
+  - crop: ???           # '???' here means it MUST be supplied by the user in the command line
   - model: deeplabv3
   - _self_
 
@@ -13,6 +13,7 @@ batch_size: 8           # Number of images in each training batch
 lr: 1e-4                # Learning rate for the current training session
 output_dir: checkpoints # Where train.py should output to
 seed: 42                # Random seed for the training process
+eval_splits: [test]     # The splits to score with the best model - [] for none
 
 
 # Determines where the outputs go - ${var} references variables from the hydra config

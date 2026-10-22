@@ -12,8 +12,8 @@ from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from dataset import SegmentationDataset
 from components.metrics import confusion_counts, scores_from_counts
+from dataset import SegmentationDataset
 from models import build_model
 
 
@@ -43,6 +43,7 @@ def load_checkpoint(checkpoint_dir: Path):
     model.eval()
 
     return model, settings
+
 
 def count_split(model, loader, prepare=None):
     """
@@ -81,19 +82,25 @@ def count_split(model, loader, prepare=None):
 
     return totals
 
-@hydra.main(config_path="conf", config_name="evaluate", version_base="1.3")
-def main(cfg: DictConfig):
 
-    # Determine output directory
-    out_dir = Path(HydraConfig.get().runtime.output_dir)
+def score_run(model, settings, data_root, crop, split, out_dir):
+    """
+    Scores a model with the given settings over the dataset specified by data_root, crop, and split - results saved to out_dir
+    :param model:       The model to be evaluated
+    :param settings:    The model's training config as returned by load_checkpoint()
+    :param data_root:   The root directory holding the datasets
+    :param crop:        Which crop is being used in evaluation  
+    :param split:       Which split the model is being evaluated against 
+    :param out_dir:     The output directory for model metrics
+    :return:            The metrics dict that was written to metrics.json
+    """
+    # Make sure out_dir exists and set output path for evaluation
+    out_dir.mkdir(parents=True, exist_ok=True)
     eval_path = out_dir / "metrics.json"
 
-    # Load model and settings (it's already in eval mode from load_checkpoint)
-    model, settings = load_checkpoint(Path(cfg.checkpoint))
-
     # Load and build scoring dataset (batch size 1 lets us score every image at native resolution)
-    dataset_root = Path(cfg.data_root) if cfg.data_root is not None else Path(settings.data_root)
-    eval_ds = SegmentationDataset(dataset_root, cfg.crop.name, cfg.split)
+    dataset_root = Path(data_root) if data_root is not None else Path(settings.data_root)
+    eval_ds = SegmentationDataset(dataset_root, crop, split)
     eval_loader = DataLoader(eval_ds, batch_size=1)
 
     # Calculate total tp/fp/fn/tn counts
@@ -103,7 +110,7 @@ def main(cfg: DictConfig):
     # By default models are scored at native label resolution with no crop or resize
     scores = scores_from_counts(**totals)  # Unpacks the values from totals as arguments
 
-    tqdm.write(f"[INFO]  Scored across all {len(eval_ds)} images in the {cfg.crop.name} {cfg.split} split")
+    tqdm.write(f"[INFO]  Scored across all {len(eval_ds)} images in the {crop} {split} split")
     tqdm.write(f"[EVAL]  Counts: TP: {totals['tp']}; FP: {totals['fp']}; FN: {totals['fn']}; TN: {totals['tn']};")
     for key in scores:
         tqdm.write(f"[EVAL]  {key}: {scores[key]:.5f}")
@@ -115,8 +122,8 @@ def main(cfg: DictConfig):
         "model": OmegaConf.to_container(settings),
         "evaluation": {
             "data_root": str(dataset_root),
-            "crop": cfg.crop.name,
-            "split": cfg.split,
+            "crop": crop,
+            "split": split,
             "images": len(eval_ds),
             "pixels": sum(totals.values())
         },
@@ -129,6 +136,23 @@ def main(cfg: DictConfig):
     # Write metrics to file
     with open(eval_path, "w") as file:
         json.dump(eval_metrics, file, indent=4)
+
+
+    # Return eval_metrics (everything can be retrieved from this)
+    return eval_metrics
+
+
+@hydra.main(config_path="conf", config_name="evaluate", version_base="1.3")
+def main(cfg: DictConfig):
+
+    # Determine output directory
+    out_dir = Path(HydraConfig.get().runtime.output_dir)
+
+    # Load model and settings (it's already in eval mode from load_checkpoint)
+    model, settings = load_checkpoint(Path(cfg.checkpoint))
+
+    # We don't need to actually capture the return here
+    score_run(model, settings, cfg.data_root, cfg.crop.name, cfg.split, out_dir)
 
 
 if __name__ == "__main__":

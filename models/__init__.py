@@ -9,7 +9,6 @@ After adding and training a new model, run `python -m tools.check_sizing checkpo
 
 from models.deeplabv3 import DeepLabV3MobileNet
 
-
 MODELS = {
     "deeplabv3": DeepLabV3MobileNet
 }

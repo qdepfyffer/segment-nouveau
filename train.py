@@ -13,11 +13,12 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from components.losses import build_loss
+from components.metrics import confusion_counts, scores_from_counts
 from components.optimizers import build_optimizer
 from components.transforms import training_transform
 from dataset import SegmentationDataset
+from evaluate import load_checkpoint, score_run
 from models import build_model
-from components.metrics import confusion_counts, scores_from_counts
 
 
 @hydra.main(config_path="conf", config_name="train", version_base="1.3")
@@ -31,6 +32,18 @@ def main(cfg: DictConfig) -> None:
     MONITORS = ["valid_loss", "sunlit_iou", "f1", "mean_iou", "precision"]
     if cfg.monitor not in MONITORS:
         raise ValueError(f"{cfg.monitor} not found in list of valid monitors: " + " ".join(MONITORS))
+
+    # Make sure cfg.eval_splits is parsed correctly
+    eval_splits = cfg.eval_splits if cfg.eval_splits is not None else []
+    if isinstance(eval_splits, str):
+        eval_splits = [eval_splits]
+
+    # Raise a ValueError if we get a split that doesn't really exist 
+    AVAILABLE_SPLITS = ["test", "train", "valid"]
+    for split in eval_splits:
+        if split not in AVAILABLE_SPLITS:
+            raise ValueError(f"{split} not found in list of valid splits: " + " ".join(AVAILABLE_SPLITS))
+    
 
     # Use our RNG seed
     torch.manual_seed(cfg.seed)
@@ -157,6 +170,17 @@ def main(cfg: DictConfig) -> None:
 
         # Put the model back in training mode before the next iteration
         model.train()
+
+    del model, optimizer  # Drop the training copy & everything the optimizer holds so it doesn't sit in memory alongside the loaded best checkpoint for evaluation
+    torch.cuda.empty_cache()  # Hand back freed memory
+
+    if not eval_splits:
+        return  # Exit here if we're not running auto evaluation of the final trained model (no eval_split specified by conf/train.yaml or user override in CLI)
+
+    # Otherwise we load the best model and evaluate it over it's OWN dataset (evaluate.py can still evaluate a model on different datasets)
+    model, settings = load_checkpoint(out_dir)
+    for split in eval_splits:
+        score_run(model, settings, None, cfg.crop.name, split, out_dir / "eval" / f"{cfg.crop.name}-{split}")
 
 if __name__ == "__main__":
     main()
