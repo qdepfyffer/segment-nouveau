@@ -4,6 +4,7 @@ Contains implementations for model scoring and evaluation
 
 from dataset import IGNORE_INDEX
 
+
 def _safe_div(top: float, bottom: float) -> float:
     """
     Ensures scoring never crashes due to a ZeroDivisionError

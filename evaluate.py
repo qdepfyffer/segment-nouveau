@@ -3,6 +3,7 @@ Script for the evaluation of trained segmentation models
 """
 
 import json
+import logging
 from pathlib import Path
 
 import hydra
@@ -16,8 +17,11 @@ from components.metrics import confusion_counts, scores_from_counts
 from dataset import SegmentationDataset
 from models import build_model
 
+# Set up logging
+log = logging.getLogger(__name__)
 
-# The below functions were pulled out so they could be imported and reused elsewhere because they implement a pattern that gets repeated in other files
+
+# The below functions were pulled out so they could be imported and reused elsewhere because they implement patterns that get repeated in other files
 def load_checkpoint(checkpoint_dir: Path):
     """
     Reads config.yaml from a checkpoint's folder and rebuilds the model by loading the saved weights
@@ -110,12 +114,12 @@ def score_run(model, settings, data_root, crop, split, out_dir):
     # By default models are scored at native label resolution with no crop or resize
     scores = scores_from_counts(**totals)  # Unpacks the values from totals as arguments
 
-    tqdm.write(f"[INFO]  Scored across all {len(eval_ds)} images in the {crop} {split} split")
-    tqdm.write(f"[EVAL]  Counts: TP: {totals['tp']}; FP: {totals['fp']}; FN: {totals['fn']}; TN: {totals['tn']};")
+    log.info(f"Scored across all {len(eval_ds)} images in the {crop} {split} split")
+    log.info(f"Counts: TP: {totals['tp']}; FP: {totals['fp']}; FN: {totals['fn']}; TN: {totals['tn']};")
     for key in scores:
-        tqdm.write(f"[EVAL]  {key}: {scores[key]:.5f}")
+        log.info(f"{key}: {scores[key]:.5f}")
 
-    tqdm.write(f"[INFO]  Saving metrics to {eval_path}")
+    log.info(f"Saving metrics to {eval_path}")
 
     # Build metrics dictionary with all desired information
     eval_metrics = {

@@ -90,7 +90,7 @@ class SegmentationDataset(Dataset):
     are held in memory, they are only loaded when they are requested, like via ds[i]. Loaded examples are represented as
     two tensors, and they are guaranteed to be the same size. Masks are also guaranteed to only contain class IDs and a
     padding value, 255 by default, represented by IGNORE_INDEX. If the optional transform is supplied, it will be
-    applied to both the image AND its mask uniformly. A PyTorch DataLoader should do the asking and stacking of results
+    applied to both the image AND its mask uniformly. A PyTorch DataLoader should do the asking for and stacking of results
     into batches.
 
 
@@ -108,6 +108,10 @@ class SegmentationDataset(Dataset):
         :param transform:   What transform, if any, should be applied to the images and masks - Must accept both image and mask, and return both image and mask
         :return:            None
         """
+
+        # Expand ~ in passed filepaths since we need absolute paths to the datasets so scripts all look in the same place even if run from other folders
+        data_root = Path(data_root).expanduser()
+
         # Store the list of pairs found for our dataset
         self.pairs = _find_pairs(data_root, crop, split)
         self.transform = transform

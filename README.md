@@ -13,6 +13,7 @@ For reference: This repo was built based on [AIISLab segment-main](https://githu
  - Running these scripts requires an NVIDIA GPU
  - Default crop size was chosen for the tomato dataset, other datasets will need this set to be specific to them
  - This project uses [hydra](https://hydra.cc/) now, rather than argparse. This changes the way command line arguments are input (`arg=val` instead of `--arg val`) and adds some new functionalities. It changes a few other things on the implementation side as well. These differences will be detailed further in this README.md when the transition to hydra is fully complete (and I've had time to write them all down).
+ - When passing filepaths for the data_root parameter, use full paths; $HOME/... works, a bare ~/... doesn't.
 
 ## Dataset Requirements:  
 Your dataset should follow the example structure below. In short: One directory containing directories for each crop, each with their own test, train, and valid folders, with each split having a visual and label folder. Extra folders are ignored.
@@ -146,8 +147,8 @@ Evaluation results are saved to `eval/<run folder name>/<crop>-<split>.json` by 
 
 ### Command line arguments (Evaluation)
 
-| Argument       | Description                                                                                                                | Example                                   |
-|----------------|----------------------------------------------------------------------------------------------------------------------------|-------------------------------------------|
+| Argument     | Description                                                                                                                | Example                                   |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
 | `checkpoint` | Path to the folder containing the desired checkpoint and settings.json                                                     | `checkpoints/tomato/2026-10-11_07-48-57/` |
 | `crop`       | The crop (name of subdirectory within the dataset root directory) you want to use in evaluation                            | `tomato`                                  |
 | `split`      | The split the model should consider for evaluation                                                                         | `test`                                    |
@@ -175,28 +176,36 @@ After adding and training a new model, run `python -m tools.check_sizing --check
 *See `components/transforms.py`*
 
 ## Repo Contents
-| File                     | Contents                                                                                                              |
-|--------------------------|-----------------------------------------------------------------------------------------------------------------------|
-| `components/`            | `__init__.py`, `losses.py`, `metrics.py`, `optimizers.py`, `transforms.py`                                            |
-| `__init__.py`            | Empty                                                                                                                 |
-| `losses.py`              | Builder and implementations for the loss functions used during model training                                         |
-| `metrics.py`             | Functions needed for the evaluation and scoring of models                                                             |
-| `optimizers.py`          | Builder and implementations for the optimizers used during model training                                             |
-| `transforms.py`          | Builder and implementations for any transforms used during model training or evaluation                               |
-| `models/`                | `__init__.py`, `deeplabv3.py`, `sizing.py`                                                                            |
-| `__init__.py`            | Dictionary of available models and a model builder function                                                           |
-| `deeplabv3.py`           | Implementation of the DeepLabV3 model with a MobileNetV3 backbone                                                     |
-| `sizing.py`              | Function to pad a batch of images on the right/bottom via reflection so height and width cleanly divide by `multiple` |
-| `tools/`                 | `__init__.py`, `check_env.py`, `check_sizing.py`                                                                      |
-| `__init__.py`            | Empty                                                                                                                 |
-| `check_env.py`           | Script to run a few commands to validate installation of PyTorch                                                      |
-| `check_sizing.py`        | Script to check whether or not a model's sizing is set correctly, and whether it can tolerate black padding           |
-| `dataset.py`             | Finds images and their corresponding labels, loads them, ensures they match                                           |
-| `evaluate.py`            | Evaluation logic and loop, this is what you run to evaluate the models                                                |
-| `README.md`              | What you're reading now.                                                                                              |
-| `requirements.txt`       | Non-torch project requirements                                                                                        |
-| `requirements-torch.txt` | Torch-specific project requirements                                                                                   |
-| `train.py`               | Training logic and loop, this is what you run to train the models                                                     |
+| File                        | Contents                                                                                                              |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `components/`               | `__init__.py`, `losses.py`, `metrics.py`, `optimizers.py`, `transforms.py`                                            |
+| `components/__init__.py`    | Empty                                                                                                                 |
+| `components/losses.py`      | Builder and implementations for the loss functions used during model training                                         |
+| `components/metrics.py`     | Functions needed for the evaluation and scoring of models                                                             |
+| `components/optimizers.py`  | Builder and implementations for the optimizers used during model training                                             |
+| `components/transforms.py`  | Builder and implementations for any transforms used during model training or evaluation                               |
+| `conf/`                     | `crop/`, `model/`, `check_sizing.yaml`, `evaluate.yaml`, `train.yaml`                                                 |
+| `conf/crop/`                | `tomato.yaml`                                                                                                         |
+| `conf/crop/tomato.yaml`     | Hydra config file for tomato specific settings                                                                        |
+| `conf/model/`               | `deeplabv3.yaml`                                                                                                      |
+| `conf/model/deeplabv3.yaml` | Hydra config file for DeepLabV3 specific settings                                                                     |
+| `conf/check_sizing.yaml`    | Hydra config file for `check_sizing.py`                                                                               |
+| `conf/evaluate.yaml`        | Hydra config file for `evaluate.py`                                                                                   |
+| `conf/train.yaml`           | Hydra config file for `train.py`                                                                                      |
+| `models/`                   | `__init__.py`, `deeplabv3.py`, `sizing.py`                                                                            |
+| `models/__init__.py`        | Dictionary of available models and a model builder function                                                           |
+| `models/deeplabv3.py`       | Implementation of the DeepLabV3 model with a MobileNetV3 backbone                                                     |
+| `models/sizing.py`          | Function to pad a batch of images on the right/bottom via reflection so height and width cleanly divide by `multiple` |
+| `tools/`                    | `__init__.py`, `check_env.py`, `check_sizing.py`                                                                      |
+| `tools/__init__.py`         | Empty                                                                                                                 |
+| `tools/check_env.py`        | Script to run a few commands to validate installation of PyTorch                                                      |
+| `tools/check_sizing.py`     | Script to check whether or not a model's sizing is set correctly, and whether it can tolerate black padding           |
+| `dataset.py`                | Finds images and their corresponding labels, loads them, ensures they match                                           |
+| `evaluate.py`               | Evaluation logic and loop, this is what you run to evaluate the models                                                |
+| `README.md`                 | What you're reading now.                                                                                              |
+| `requirements.txt`          | Non-torch project requirements                                                                                        |
+| `requirements-torch.txt`    | Torch-specific project requirements                                                                                   |
+| `train.py`                  | Training logic and loop, this is what you run to train the models                                                     |
 
 ## Design decisions, or alternatively "Why would you rebuild a perfectly good* tool?"
 
