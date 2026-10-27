@@ -1,0 +1,2 @@
+name: pistachio
+train_crop: [336, 496]  # Height, width of the random training crop (images in the CIWA+ pistachio dataset are 504x342)
