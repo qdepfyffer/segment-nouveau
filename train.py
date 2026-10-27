@@ -17,9 +17,9 @@ from tqdm import tqdm
 from components.losses import build_loss
 from components.metrics import confusion_counts, scores_from_counts
 from components.optimizers import build_optimizer
+from components.scoring import load_checkpoint, score_run
 from components.transforms import training_transform
 from dataset import SegmentationDataset
-from evaluate import load_checkpoint, score_run
 from models import build_model
 
 # Set up logging

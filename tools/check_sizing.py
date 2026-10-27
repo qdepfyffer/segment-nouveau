@@ -21,8 +21,8 @@ from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 
 from components.metrics import scores_from_counts
+from components.scoring import count_split, load_checkpoint
 from dataset import SegmentationDataset
-from evaluate import count_split, load_checkpoint
 from models.sizing import pad_to_multiple
 
 
