@@ -1,5 +1,7 @@
 # Segment-nouveau
 
+## This readme is currently massively out of date and lacking in information, I promise I'll get around to fixing it when the repo isn't being massively changed 
+
 **nouveau**  
 *adjective*  
 nou·veau - /nü-ˈvō/  

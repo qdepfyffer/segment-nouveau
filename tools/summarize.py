@@ -23,7 +23,7 @@ def main(cfg: DictConfig):
     count = len(metrics_paths)
     log.info(f"Found {count} total metrics.json files in {cfg.folder}.")
     if count == 0:
-        log.warning(f"No metrics.json files found under {cfg.folder}. Please make sure you've provided a valid sweep folder.")
+        log.warning(f"No metrics.json files found under {cfg.folder}. Please make sure you've provided a folder containing at least one metrics.json file.")
         return
 
     # Get the output directory

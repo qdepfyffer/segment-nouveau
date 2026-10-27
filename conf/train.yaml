@@ -29,3 +29,7 @@ hydra:
         exclude_keys: [data_root, crop, output_dir]
         kv_sep: "-"
         item_sep: "+"
+  job_logging:
+    handlers:
+      file:
+        mode: w   # Overwrite the log on each run instead of appending

@@ -12,3 +12,7 @@ hydra:
   run:
     dir: ${checkpoint}/eval/${crop.name}-${split}
   output_subdir: .hydra-check_sizing
+  job_logging:
+    handlers:
+      file:
+        mode: w   # Overwrite the log on each run instead of appending

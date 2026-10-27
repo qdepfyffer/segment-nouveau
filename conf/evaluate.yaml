@@ -2,13 +2,17 @@ defaults:
   - crop: ???     # The crop to evaluate
   - _self_
 
-checkpoint: ???   # Training run folder - holds .hydra/ and <model>-best.pt
+folder: ???       # A training run folder, or any folder containing training runs
 split: test       # train, valid or test
 data_root: null   # null = use the data_root the model was trained with
 
 hydra:
   run:
-    dir: ${checkpoint}/eval/${crop.name}-${split}
+    dir: ${folder}/eval/${crop.name}-${split}
   sweep:
-    dir: ${checkpoint}/eval
+    dir: ${folder}/eval
     subdir: ${crop.name}-${split}
+  job_logging:
+    handlers:
+      file:
+        mode: w   # Overwrite the log on each run instead of appending
