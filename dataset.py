@@ -15,6 +15,69 @@ classes = [("Non-sunlit",(165, 42, 42)),
 # Value of pixels that should be ignored (255 by default) - don't confuse this with the (0, 255, 0) green for sunlit pixels
 IGNORE_INDEX = 255
 
+# Suffixes corresponding to valid image files
+IMAGE_SUFFIXES = {".jpg", ".jpeg"}
+
+
+def _find_pairs(data_root: Path, crop: str, split: str) -> list[tuple[Path, Path]]:
+    """
+    Returns a sorted list of (visual_img, label_img) tuples for a given crop and split.
+    :param data_root:   Root directory containing the dataset, should have a subfolder for each crop - See README.md for expected folder structure
+    :param crop:        The crop that the dataset contains (e.g. almond, citrus, grape, pistachio, tomato)
+    :param split:       The split that is being searched (test, train, or valid)
+    :return:            A list of tuples containing pairs of visual images and their paired labels
+    """
+
+    pairs = []
+
+    # This is how the canonical dataset is organized at the moment. If that ever changes, this will need to change too.
+    vis_dir = data_root / crop / split / "visual"
+
+    # Validate the visual image directory before we go any further, error out early if we can't find it
+    if not vis_dir.is_dir():
+        raise FileNotFoundError(
+            f"{vis_dir} is not a valid directory. Make sure {data_root} exists and that crop and split arguments are spelled correctly.")
+
+    # Get a sorted list of valid images with suffixes belonging to IMAGE_SUFFIXES
+    vis_imgs = sorted(p for p in vis_dir.iterdir() if p.suffix.lower() in IMAGE_SUFFIXES)
+
+    # Now we need to find the labels to match the visual images
+    # Label filenames are <stem>_L.png, where <stem> comes from _label_stem()
+    for file in vis_imgs:
+        stem = _label_stem(file)
+        lbl_path = data_root / crop / split / "label" / f"{stem}_L.png"
+        # Raise an exception if we can't find a label for an image
+        if not lbl_path.exists():
+            raise FileNotFoundError(
+                f"The label for {file} could not be located in {str(data_root / crop / split / 'label')}")
+        else:
+            # If we haven't errored out we can append the pair (we found the label for the image)
+            pairs.append((file, lbl_path))
+
+    # Return the pairs (they're built based on the sorted order of the visual images, so they should be sorted)
+    return pairs
+
+
+def _label_stem(image_path: Path) -> str:
+    """
+    Takes an image file name and returns the stem its label uses
+    :param image_path:  The path to the image we want the stem for
+    :return:            The stem for the given visual image
+    """
+    # Get raw stem
+    stem = image_path.stem
+
+    # Strip "-Visual" suffix from stem
+    stem = stem.removesuffix("-Visual")
+
+    # Strip potential remaining suffixes
+    inner = Path(stem)
+    if inner.suffix.lower() in IMAGE_SUFFIXES:
+        stem = inner.stem
+
+    # Return the fully-stripped stem
+    return stem
+
 
 def _load_mask(label_path: Path) -> np.ndarray:
     """
@@ -43,44 +106,6 @@ def _load_mask(label_path: Path) -> np.ndarray:
 
     # If we didn't error out we can return the mask, it's now a label_h x label_w ndarray of 0s and 1s
     return mask
-
-
-def _find_pairs(data_root: Path, crop: str, split: str) -> list[tuple[Path, Path]]:
-    """
-    Returns a sorted list of (visual_img, label_img) tuples for a given crop and split.
-    :param data_root:   Root directory containing the dataset, should have a subfolder for each crop - See README.md for expected folder structure
-    :param crop:        The crop that the dataset contains (e.g. almond, citrus, grape, pistachio, tomato)
-    :param split:       The split that is being searched (test, train, or valid)
-    :return:            A list of tuples containing pairs of visual images and their paired labels
-    """
-
-    pairs = []
-
-    # This is how the canonical dataset is organized at the moment. If that ever changes, this will need to change too.
-    vis_dir = data_root / crop / split / "visual"
-
-    # Validate the visual image directory before we go any further, error out early if we can't find it
-    if not vis_dir.is_dir():
-        raise FileNotFoundError(
-            f"{vis_dir} is not a valid directory. Make sure {data_root} exists and that crop and split arguments are spelled correctly.")
-
-    vis_imgs = sorted(vis_dir.glob("*.jpg"))  # Get sorted list of images from the visual image directory
-
-    # Now we need to find the labels to match the visual images
-    # Expected convention for label filenames: *vis_img_stem*_L.png
-    for file in vis_imgs:
-        stem = file.stem
-        lbl_path = data_root / crop / split / "label" / f"{stem}_L.png"
-        # Raise an exception if we can't find a label for an image
-        if not lbl_path.exists():
-            raise FileNotFoundError(
-                f"The label for {file} could not be located in {str(data_root / crop / split / 'label')}")
-        else:
-            # If we haven't errored out we can append the pair (we found the label for the image)
-            pairs.append((file, lbl_path))
-
-    # Return the pairs (they're built based on the sorted order of the visual images, so they should be sorted)
-    return pairs
 
 
 # Build the PyTorch Dataset class
@@ -145,7 +170,7 @@ class SegmentationDataset(Dataset):
 
         # Make sure the images and the labels are the same size. The old segment-main pipeline resized both to 512x512, which hid any potential mismatches
         if mask.shape != vis_img.shape[1:]:
-            raise ValueError(f"Mask {lbl_path.stem} of size {mask.shape} does not match image {vis_path.stem} of size {vis_img.shape[1:]}")
+            raise ValueError(f"Mask {lbl_path.name} of size {mask.shape} does not match image {vis_path.name} of size {vis_img.shape[1:]}")
 
         # Apply any optional transforms
         if self.transform is not None:
