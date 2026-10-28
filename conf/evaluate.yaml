@@ -5,6 +5,7 @@ defaults:
 folder: ???       # A training run folder, or any folder containing training runs
 split: test       # train, valid or test
 data_root: null   # null = use the data_root the model was trained with
+device: cuda      # cuda, cuda:<n> for a specific GPU, or cpu
 
 hydra:
   run:

@@ -14,6 +14,7 @@ lr: 1e-4                # Learning rate for the current training session
 output_dir: checkpoints # Where train.py should output to
 seed: 42                # Random seed for the training process
 eval_splits: [test]     # The splits to score with the best model - [] for none
+device: cuda            # cuda, cuda:<n> for a specific GPU, or cpu
 
 
 # Determines where the outputs go - ${var} references variables from the hydra config
@@ -26,7 +27,7 @@ hydra:
   job:
     config:
       override_dirname:
-        exclude_keys: [data_root, crop, output_dir]
+        exclude_keys: [data_root, crop, output_dir, device]
         kv_sep: "-"
         item_sep: "+"
   job_logging:

@@ -19,10 +19,11 @@ from models import build_model
 log = logging.getLogger(__name__)
 
 # The below functions were pulled out so they could be imported and reused elsewhere because they implement patterns that get repeated in other files
-def load_checkpoint(checkpoint_dir: Path):
+def load_checkpoint(checkpoint_dir: Path, device):
     """
-    Reads config.yaml from a checkpoint's folder and rebuilds the model by loading the saved weights
+    Reads config.yaml from a checkpoint's folder and rebuilds the model by loading the saved weights and moves the model to the specified device
     :param checkpoint_dir:  Directory holding the checkpoint and the config.yaml that resulted in that set of weights
+    :param device:          The device the model should be moved to (cuda, cuda:n, cpu)
     :return:                The rebuilt model and its training config
     """
     # Load saved settings
@@ -37,10 +38,10 @@ def load_checkpoint(checkpoint_dir: Path):
         # We should only end up here if the checkpoints are missing but the settings aren't, which shouldn't ever happen
         raise FileNotFoundError(f"Model checkpoint could not be found at {checkpoint_path}. Please double check and try again.")
 
-    # Build the model based on saved settings, move it to GPU
+    # Build the model based on saved settings, move it to specified device
     model = build_model(settings.model.name, num_classes=2)  # CIWA+ only uses 2 classes
-    model.load_state_dict(torch.load(checkpoint_path, weights_only=True))  # We only load the weights for safety
-    model.to("cuda")
+    model.load_state_dict(torch.load(checkpoint_path, map_location=device, weights_only=True))  # We only load the weights for safety
+    model.to(device)
     model.eval()
 
     return model, settings
@@ -62,12 +63,15 @@ def count_split(model, loader, prepare=None):
         "tn": 0,
     }
 
+    # Send batches to the same device as the model
+    device = next(model.parameters()).device  # model.parameters() -> weights, next() gives the first one, .device says where it is
+
     # Begin evaluation
     with torch.no_grad():
         for images, masks in tqdm(loader, desc="[EVAL]  Progress"):
-            # Put images and masks on GPU
-            images = images.to("cuda")
-            masks = masks.to("cuda")
+            # Put images and masks on the same device as the model
+            images = images.to(device)
+            masks = masks.to(device)
             height, width = masks.shape[-2:]
 
             if prepare is not None:

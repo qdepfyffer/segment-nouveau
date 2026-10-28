@@ -65,7 +65,7 @@ def main(cfg: DictConfig) -> None:
 
     # Build specified model
     model = build_model(cfg.model.name, num_classes=2)
-    model = model.to("cuda")  # Move model to GPU
+    model = model.to(cfg.device)  # Move model to specified device
 
     # Load our datasets
     train_ds = SegmentationDataset(Path(cfg.data_root), cfg.crop.name, "train",
@@ -94,8 +94,8 @@ def main(cfg: DictConfig) -> None:
         for images, masks in tqdm(train_loader, desc=f"[TRAIN] Epoch {epoch + 1}"):
 
             # Put images and masks on GPU
-            images = images.to("cuda")
-            masks = masks.to("cuda")
+            images = images.to(cfg.device)
+            masks = masks.to(cfg.device)
 
             logits = model(images)
             optimizer.zero_grad()
@@ -128,8 +128,8 @@ def main(cfg: DictConfig) -> None:
             for images, masks in tqdm(valid_loader, desc=f"[VALID] Epoch {epoch + 1}"):
 
                 # Put images and masks on GPU
-                images = images.to("cuda")
-                masks = masks.to("cuda")
+                images = images.to(cfg.device)
+                masks = masks.to(cfg.device)
 
                 # Get model's predictions and calculate loss
                 logits = model(images)
@@ -202,7 +202,7 @@ def main(cfg: DictConfig) -> None:
         if not best_model_path.exists():
             log.warning(f"Checkpoint not found: {best_model_path}")  # Exit early if the checkpoint doesn't exist for any reason
             return
-        model, settings = load_checkpoint(out_dir)
+        model, settings = load_checkpoint(out_dir, cfg.device)
         for split in eval_splits:
             score_run(model, settings, None, cfg.crop.name, split, out_dir / "eval" / f"{cfg.crop.name}-{split}")
     except Exception:

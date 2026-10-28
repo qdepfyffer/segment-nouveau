@@ -40,7 +40,7 @@ def main(cfg: DictConfig):
     log = logging.getLogger(__name__)
 
     # Load the model
-    model, settings = load_checkpoint(Path(cfg.checkpoint))
+    model, settings = load_checkpoint(Path(cfg.checkpoint), cfg.device)
 
     # Load and build scoring dataset (batch size 1 lets us score every image at native resolution)
     dataset_root = Path(cfg.data_root) if cfg.data_root is not None else Path(settings.data_root)

@@ -7,6 +7,7 @@ defaults:
 checkpoint: ???   # Training run folder, has .hydra/ and <model>-best.pt
 split: valid      # Which split is being scored
 data_root: null   # null = use data_root from the model's cfg (which data_root the model was trained with)
+device: cuda      # cuda, cuda:<n> for a specific GPU, or cpu
 
 hydra:
   run:

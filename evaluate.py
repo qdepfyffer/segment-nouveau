@@ -51,7 +51,7 @@ def main(cfg: DictConfig):
             logging.getLogger().addHandler(handler)
         try:
             # Load the run that is currently being scored
-            model, settings = load_checkpoint(run)
+            model, settings = load_checkpoint(run, cfg.device)
 
             # Score the run
             score_run(model, settings, cfg.data_root, cfg.crop.name, cfg.split, run_out)
