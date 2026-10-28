@@ -118,44 +118,70 @@ Tensor sum: 12.0
 
 ## Training a model
 
-**Example usage**: `python train.py data_root=path/to/dataset crop=tomato epochs=100 patience=7 batch_size=8 lr=1e-4`
+**Example single run**: `python train.py data_root=path/to/dataset crop=tomato epochs=100 patience=7 lr=1e-4 seed=0`
 
-Checkpoints are saved to `checkpoints/crop/timestamp/architecture-best.pt` by default, along with the `settings.json` that was used to produce them and the `history.json` that accompanied their training.
+Checkpoints are saved to `checkpoints/<crop>/<timestamp>/<model>-best.pt` by default, along with a `.hydra/` folder that contains `config.yaml` and `overrides.yaml` detailing how the training was configured, and the `history.json` and `train.log` that accompanied their training. Models are automatically evaluated against each split in `eval_splits` (test split by default) corresponding to the crop they were trained on, and evaluation results are in `eval/<crop>-<split>/metrics.json`.
+
+**Example multi-run**: `python train.py --multirun data_root=path/to/dataset crop=tomato epochs=100 patience=7 lr=1e-4,1e-3 seed=0,1,2`
+
+Sweeps (see above multi-run example) output to `checkpoints/sweeps/<timestamp>/<crop>/<settings>/`, where `<settings>` refers to the unique settings used to generate that specific checkpoint, e.g., `epochs-100+lr-0.0001+patience-7+seed-0`
+
+*Note: When passing a path, use `$HOME` instead of `~`, and if passing a list, arguments must be quoted (see `eval_splits` and `crop.train_crop` below and note the single quotes around the flags)*
 
 ### Command line arguments (Training)
 
-| Argument       | Description                                                                                                                  | Example                  |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| `data_root`    | Root dataset directory, should have a subdirectory for the crop you want to train on                                         | `/home/ciwa-full-split/` |
-| `crop`         | The crop (name of subdirectory within the dataset root directory) you want to train on                                       | `tomato`                 |
-| `architecture` | Which model to train                                                                                                         | `deeplabv3`              |
-| `optimizer`    | Which optimizer to use during training                                                                                       | `rmsprop`                |
-| `dice_weight`  | Determines dice weight to be used for loss - cross-entropy plus dice weight multiplied by dice loss - 0 to disable dice loss | `1.0`                    |
-| `epochs`       | Maximum number of epochs to train for (passes over the training set)                                                         | `100`                    |
-| `monitor`      | Which metric to monitor during training for early stopping and determining the best model to save                            | `valid_loss`             |
-| `patience`     | How many epochs to continue training for without seeing improvement in the monitored value                                   | `7`                      |
-| `batch_size`   | Number of images in each training batch                                                                                      | `8`                      |
-| `lr`           | The learning rate of the model                                                                                               | `1e-4`                   |
-| `train_crop`   | The size of the random crop that is applied to training images (h x w)                                                       | `256 480`                |
-| `output_dir`   | The folder this script should output to                                                                                      | `checkpoints`            |
-| `seed`         | Number to use as a random seed for anything that can be seeded                                                               | `42`                     |
+| Argument          | Description                                                                                                                  | Example                            |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| `data_root`       | Root dataset directory, should have a subdirectory for the crop you want to train on - Required                              | `data_root=/home/ciwa-full-split/` |
+| `crop`            | The crop (name of subdirectory within the dataset root directory) you want to train on - Required                            | `crop=tomato`                      |
+| `model`           | Which model to train                                                                                                         | `model=deeplabv3`                  |
+| `optimizer`       | Which optimizer to use during training                                                                                       | `optimizer=rmsprop`                |
+| `dice_weight`     | Determines dice weight to be used for loss - cross-entropy plus dice weight multiplied by dice loss - 0 to disable dice loss | `dice_weight=1.0`                  |
+| `epochs`          | Maximum number of epochs to train for (passes over the training set)                                                         | `epochs=100`                       |
+| `monitor`         | Which metric to monitor during training for early stopping and determining the best model to save                            | `monitor=valid_loss`               |
+| `patience`        | How many epochs to continue training for without seeing improvement in the monitored value                                   | `patience=7`                       |
+| `batch_size`      | Number of images in each training batch                                                                                      | `batch_size=8`                     |
+| `lr`              | The learning rate of the model                                                                                               | `lr=1e-4`                          |
+| `crop.train_crop` | The size of the random crop that is applied to training images (h x w)                                                       | `'crop.train_crop=[256,480]'`      |
+| `output_dir`      | The folder this script should output to                                                                                      | `output_dir=checkpoints`           |
+| `seed`            | Number to use as a random seed for anything that can be seeded                                                               | `seed=42`                          |
+| `eval_splits`     | Which splits the model should be automatically evaluated against after training is completed                                 | `'eval_splits=[test, valid]'`*     |
 
+*`'eval_splits=[]'` disables automatic post-training evaluation
 
 ## Evaluating a model
 
-**Example usage**: `python evaluate.py --checkpoint checkpoints/tomato/2026-10-11_07-48-57/ --crop tomato --split test`
+**Example single evaluation**: `python evaluate.py folder=checkpoints/<crop>/<timestamp>/ crop=tomato split=test`
 
-Evaluation results are saved to `eval/<run folder name>/<crop>-<split>.json` by default, where "crop" represents the evaluated dataset and "split" the evaluated split.
+Evaluation results are saved to `<run>/eval/<crop>-<split>/metrics.json`, where "crop" represents the evaluated dataset and "split" the evaluated split, alongside the accompanying `evaluate.log`.
+
+**Example multi-evaluation**: `python evaluate.py folder=checkpoints/sweeps/<timestamp>/ crop=tomato`
+
+Evaluation of a whole sweep will score any `*-best.pt` files contained in the `folder` or any of `folder`'s subdirectories. An overall evaluate.log will be created in `<folder>/eval/<crop>-<split>/` which will list each run along with any failures. One failed run should not stop the others.
+
+*Note: you can score a model on a crop different from the one it trained on, since `crop` is just the dataset being scored*
 
 ### Command line arguments (Evaluation)
 
-| Argument     | Description                                                                                                                | Example                                   |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| `checkpoint` | Path to the folder containing the desired checkpoint and settings.json                                                     | `checkpoints/tomato/2026-10-11_07-48-57/` |
-| `crop`       | The crop (name of subdirectory within the dataset root directory) you want to use in evaluation                            | `tomato`                                  |
-| `split`      | The split the model should consider for evaluation                                                                         | `test`                                    |
-| `output_dir` | The folder this script should output to                                                                                    | `eval/`                                   |
-| `data_root`  | Root dataset directory override, for when the data_root in the model's settings.json does not exist on the current machine | `/home/ciwa-full-split/`                  |
+| Argument    | Description                                                                                                                             | Example                                          |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `folder`    | A run folder, or any folder containing runs - Required                                                                                  | `folder=checkpoints/tomato/2026-10-11_07-48-57/` |
+| `crop`      | The crop (name of subdirectory within the dataset root directory) you want to use in evaluation - Required                              | `crop=tomato`                                    |
+| `split`     | The split the model should consider for evaluation                                                                                      | `split=test`                                     |
+| `data_root` | Root dataset directory override. Use when the data_root in the corresponding `.hydra/config.yaml` does not exist on the current machine | `data_root=/home/ciwa-full-split/`*              |
+
+*`null` as a value for this option means "use the one the model used during training"
+
+## Summarizing results
+
+**Example summarization**: `python -m tools.summarize folder=checkpoints/sweeps/<timestamp>/`
+
+Takes a set of scored runs (as a result of automatic evaluation from `train.py` or manually via `evaluate.py`), reads the corresponding `metrics.json` for each run, groups runs that differ in seed only, and reports the mean ± standard deviation across stats for those runs. Prints one table per scored crop + split. Writes output to `<folder>/summary/summary.json` and `<folder>/summary/summarize.log`. The log holds the same table that's printed to the console.
+
+| Argument  | Description                                                                   | Example                                         |
+| --------- | ----------------------------------------------------------------------------- | ----------------------------------------------- |
+| `folder`  | A sweep, crop folder inside a sweep, or any folder containing runs - Required | `folder=checkpoints/sweeps/2026-10-22_18-02-44` |
+| `metrics` | Which scores to show, default is all 8                                        | `'metrics=[sunlit_iou,f1]'`                     |
 
 ## Extending the suite
 
@@ -217,6 +243,6 @@ After adding and training a new model, run `python -m tools.check_sizing --check
  - This suite works out of the box with the canonical CIWA+ dataset. You shouldn't have to reorganize any files. If you still want to use the old dataset layout from the other repos, I plan to add support for that eventually.
  - No need for per-dataset files containing classes. It was the same file in every dataset, so the class specifications now live at the top of dataset.py. I can add support for a per-dataset `.csv` file later, which would override any hard-coded class specifications.
  - Defaults are set to match earlier papers / repos where applicable.
- - Every run is accompanied by a `settings.json` file, to aid in reproducibility during future runs
+ - Every run is accompanied by a `.hydra/config.yaml` file, to aid in reproducibility during future runs
 
 *\* Subjective*
