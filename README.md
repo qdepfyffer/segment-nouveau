@@ -10,8 +10,9 @@ A (hopefully more) modular framework for the implementation, training, and testi
 For reference: This repo was built based on [AIISLab segment-main](https://github.com/AIISLab/segment-main) repo, which is, as far as I can tell, the successor to [George Seif's Semantic-Segmentation-Suite](https://github.com/GeorgeSeif/Semantic-Segmentation-Suite) repo that appears to have been used in the earlier CIWA+ paper.
 
 ### Important notes:
- - Running these scripts requires an NVIDIA GPU
- - Each crop has its own `train_crop` value in `conf/crop/<crop>.yaml`
+ - Runs on an NVIDIA GPU by default (`device=cuda`). `device=cpu` works but is much slower.
+ - Console logging only shows the time, .log files show the entire timestamp. Preferences for this functionality live in `conf/hydra/job_logging/custom.yaml`
+ - Each crop has its own `train_crop` value in `conf/crop/<crop>.yaml` which will need to be set for any crops added down the line.
  - This project uses [hydra](https://hydra.cc/) now, rather than argparse. This changes the way command line arguments are input (`arg=val` instead of `--arg val`) and adds some new functionalities.
  - When passing filepaths for the data_root parameter, use full paths; $HOME/... works, a bare ~/... doesn't.
 
@@ -118,36 +119,42 @@ Tensor sum: 12.0
 
 **Example single run**: `python train.py data_root=path/to/dataset crop=tomato epochs=100 patience=7 lr=1e-4 seed=0`
 
-Checkpoints are saved to `checkpoints/<crop>/<timestamp>/<model>-best.pt` by default, along with a `.hydra/` folder that contains `config.yaml` and `overrides.yaml` detailing how the training was configured, and the `history.json` and `train.log` that accompanied their training. Models are automatically evaluated against each split in `eval_splits` (test split by default) corresponding to the crop they were trained on, and evaluation results are in `eval/<crop>-<split>/metrics.json`.
+Checkpoints are saved to `checkpoints/<crop>/<timestamp>/<model>-best.pt` by default, along with a `.hydra/` folder that contains `config.yaml` and `overrides.yaml` detailing how the training was configured, and the `history.json` and `train.log` that accompanied their training. A `git.json` file is written in the same location which details the state of the repo at the time the training was run. Models are automatically evaluated against each split in `eval_splits` (test split by default) corresponding to the crop they were trained on, and evaluation results are in `eval/<crop>-<split>/metrics.json`.
 
 **Example multi-run**: `python train.py --multirun data_root=path/to/dataset crop=tomato epochs=100 patience=7 lr=1e-4,1e-3 seed=0,1,2`
 
-Sweeps (see above multi-run example) output to `checkpoints/sweeps/<timestamp>/<crop>/<settings>/`, where `<settings>` refers to the unique settings used to generate that specific checkpoint, e.g., `epochs-100+lr-0.0001+patience-7+seed-0`
+Sweeps (see above multi-run example) output to `checkpoints/sweeps/<timestamp>/<crop>/<settings>/`, where `<settings>` refers to the unique settings used to generate that specific checkpoint, e.g., `epochs-100+lr-0.0001+patience-7+seed-0`. Non-experimental keys like `device` or `num_workers` are left out of these settings, so changing them won't split a sweep's groupings.
 
 *Note: When passing a path, use `$HOME` instead of `~`, and if passing a list, arguments must be quoted (see `eval_splits` and `crop.train_crop` below and note the single quotes around the flags)*
 
 ### Command line arguments (Training)
 
-| Argument          | Description                                                                                                                  | Example                            |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| `data_root`       | Root dataset directory, should have a subdirectory for the crop you want to train on - Required                              | `data_root=/home/ciwa-full-split/` |
-| `crop`            | The crop (name of subdirectory within the dataset root directory) you want to train on - Required                            | `crop=tomato`                      |
-| `model`           | Which model to train                                                                                                         | `model=deeplabv3`                  |
-| `optimizer`       | Which optimizer to use during training                                                                                       | `optimizer=rmsprop`                |
-| `dice_weight`     | Determines dice weight to be used for loss - cross-entropy plus dice weight multiplied by dice loss - 0 to disable dice loss | `dice_weight=1.0`                  |
-| `epochs`          | Maximum number of epochs to train for (passes over the training set)                                                         | `epochs=100`                       |
-| `monitor`         | Which metric to monitor during training for early stopping and determining the best model to save                            | `monitor=valid_loss`               |
-| `patience`        | How many epochs to continue training for without seeing improvement in the monitored value                                   | `patience=7`                       |
-| `batch_size`      | Number of images in each training batch                                                                                      | `batch_size=8`                     |
-| `lr`              | The learning rate of the model                                                                                               | `lr=1e-4`                          |
-| `crop.train_crop` | The size of the random crop that is applied to training images (h x w)                                                       | `'crop.train_crop=[256,480]'`      |
-| `output_dir`      | The folder this script should output to                                                                                      | `output_dir=checkpoints`           |
-| `seed`            | Number to use as a random seed for anything that can be seeded                                                               | `seed=42`                          |
-| `eval_splits`     | Which splits the model should be automatically evaluated against after training is completed                                 | `'eval_splits=[test, valid]'`*     |
+| Argument           | Description                                                                                                                                                     | Example                            |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| `data_root`        | Root dataset directory, should have a subdirectory for the crop you want to train on - Required                                                                 | `data_root=/home/ciwa-full-split/` |
+| `crop`             | The crop (name of subdirectory within the dataset root directory) you want to train on - Required                                                               | `crop=tomato`                      |
+| `model`            | Which model to train                                                                                                                                            | `model=deeplabv3`                  |
+| `optimizer`        | Which optimizer to use during training                                                                                                                          | `optimizer=rmsprop`                |
+| `loss`             | Specifies the loss function to be used during training                                                                                                          | `loss=ce_dice`                     |
+| `loss.dice_weight` | Determines dice weight to be used for loss - cross-entropy plus dice weight multiplied by dice loss (only to be used if using `loss=ce_dice`)                   | `loss.dice_weight=1.0`             |
+| `epochs`           | Maximum number of epochs to train for (passes over the training set)                                                                                            | `epochs=100`                       |
+| `monitor`          | Which metric to monitor during training for early stopping and determining the best model to save                                                               | `monitor=valid_loss`               |
+| `patience`         | How many epochs to continue training for without seeing improvement in the monitored value                                                                      | `patience=7`                       |
+| `batch_size`       | Number of images in each training batch                                                                                                                         | `batch_size=8`                     |
+| `lr`               | The learning rate of the model                                                                                                                                  | `lr=1e-4`                          |
+| `crop.train_crop`  | The size of the random crop that is applied to training images (h x w)                                                                                          | `'crop.train_crop=[256,480]'`      |
+| `output_dir`       | The folder this script should output to                                                                                                                         | `output_dir=checkpoints`           |
+| `seed`             | Number to use as a random seed for anything that can be seeded                                                                                                  | `seed=42`                          |
+| `eval_splits`      | Which splits the model should be automatically evaluated against after training is completed                                                                    | `'eval_splits=[test, valid]'`*     |
+| `sizing`           | How images are sized for the model: native = random training crops, full size imgs for validation/scoring; stretch512 resizes everything to 512x512             | `sizing=stretch512`                |
+| `device`           | Device where everything should happen: `cuda`, `cuda:<n>` for a specific GPU, or `cpu`.                                                                         | `device=cuda:1`                    |
+| `num_workers`      | Number of processes loading data in parallel - note that this does in fact result in different random crops, so keep it the same when trying to reproduce a run | `num_workers=8`                    |
 
 *`'eval_splits=[]'` disables automatic post-training evaluation
 
 ## Evaluating a model
+
+Models are scored using the sizing they were trained with, and always against the original labels at full size. `metrics.json` records sizing and code version used.
 
 **Example single evaluation**: `python evaluate.py folder=checkpoints/<crop>/<timestamp>/ crop=tomato split=test`
 
@@ -161,12 +168,14 @@ Evaluation of a whole sweep will score any `*-best.pt` files contained in the `f
 
 ### Command line arguments (Evaluation)
 
-| Argument    | Description                                                                                                                             | Example                                          |
-| ----------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| `folder`    | A run folder, or any folder containing runs - Required                                                                                  | `folder=checkpoints/tomato/2026-10-11_07-48-57/` |
-| `crop`      | The crop (name of subdirectory within the dataset root directory) you want to use in evaluation - Required                              | `crop=tomato`                                    |
-| `split`     | The split the model should consider for evaluation                                                                                      | `split=test`                                     |
-| `data_root` | Root dataset directory override. Use when the data_root in the corresponding `.hydra/config.yaml` does not exist on the current machine | `data_root=/home/ciwa-full-split/`*              |
+| Argument      | Description                                                                                                                             | Example                                          |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `folder`      | A run folder, or any folder containing runs - Required                                                                                  | `folder=checkpoints/tomato/2026-10-11_07-48-57/` |
+| `crop`        | The crop (name of subdirectory within the dataset root directory) you want to use in evaluation - Required                              | `crop=tomato`                                    |
+| `split`       | The split the model should consider for evaluation                                                                                      | `split=test`                                     |
+| `data_root`   | Root dataset directory override. Use when the data_root in the corresponding `.hydra/config.yaml` does not exist on the current machine | `data_root=/home/ciwa-full-split/`*              |
+| `device`      | Device where everything should happen: `cuda`, `cuda:<n>` for a specific GPU, or `cpu`.                                                 | `device=cuda:1`                                  |
+| `num_workers` | Number of processes loading data in parallel                                                                                            | `num_workers=8`                                  |
 
 *`null` as a value for this option means "use the one the model used during training"
 
@@ -189,7 +198,9 @@ Takes a set of scored runs (as a result of automatic evaluation from `train.py` 
 
 New models require adding a config file under `conf/model/<name>.yaml`, containing `name: <name>` where `<name>` is its key in `MODELS`.
 
-After adding and training a new model, run `python -m tools.check_sizing checkpoint=<run folder> crop=<crop>` for each crop you plan to report. Command line arguments for `check_sizing.py`, `checkpoint` and `crop`, are both required.
+*Note: You only need to do the following if the model was trained with `sizing=native`. `check_sizing.py` only applies to models trained with native sizing, it stops with a warning otherwise. This is by design.*
+
+After adding and training a new model, run `python -m tools.check_sizing checkpoint=<run folder> crop=<crop>` for each crop you plan to report. Command line arguments for `check_sizing.py`, `checkpoint` and `crop`, are both required. This should tell you whether or not the model's performance is being harmed by an incorrect `size_multiple`. The first two values printed by `check_sizing.py` should be relatively close to each other. If not, you'll want to increase the model's size multiple, e.g. 8 -> 16, 16 -> 32, and run `check_sizing.py` again. Existing checkpoints should pick up the change without retraining, though you should retrain before reproting results since validation used the old padding during training. If the third value is exceptionally low, the model is breaking down when it sees black-padded images. This should be a non-issue for now since nowhere in this repo uses black padding.
 
 ### Adding a new crop
 
@@ -197,7 +208,15 @@ Create `conf/crop/<crop>.yaml` with `name` and `train_crop`, following `tomato.y
 
 ### Adding a new loss function
 
-*See `components/losses.py`*
+1. Write the loss as a function or class in `components/losses.py`
+2. Add it to the LOSSES registry (also in `components/losses.py`)
+3. Create `conf/loss/<name>.yaml`, with `name: <name>`, plus any arguments it takes (see `conf/loss/ce_dice.yaml` for example)
+
+### Adding a new sizing method
+
+1. Create `conf/sizing/<name>.yaml`
+2. add a branch in `build_training_transform` (`components/transforms.py`)
+3. add a branch in `predict_logits` (`components/inference.py`)
 
 ### Adding a new optimizer
 
@@ -220,12 +239,13 @@ Create `conf/crop/<crop>.yaml` with `name` and `train_crop`, following `tomato.y
 
 ## Design decisions, or alternatively "Why would you rebuild a perfectly good* tool?"
 
- - Images are never stretched. If models expect inputs to have a specific aspect ratio, we instead take a randomly cropped window from our full images, so that the model isn't learning from a distorted view of our data. This follows the approach of the suite used in the earlier papers.
+ - Native sizing of images is the default. Training uses random crops so the models aren't learning from distorted images. `sizing=stretch512` reproduces the 2026 tomato paper's stretch-to-512x512 for comparison sake. In any case, scores are always computed against the original label at full size.
  - When a model is run, images are padded out to clean multiples of a size specified by the model implementation. This padding uses mirroring rather than black pixels. Never pad with black. With the default training crop behavior, this only affects validation and testing
  - Validation images handled with a batch size of 1. This is to allow for the differently sized images within the tomato dataset. Previous implementations stretched everything to 512x512, so never had batches of mixed sizes.
  - This suite works out of the box with the canonical CIWA+ dataset. You shouldn't have to reorganize any files. If you still want to use the old dataset layout from the other repos, I plan to add support for that eventually.
  - No need for per-dataset files containing classes. It was the same file in every dataset, so the class specifications now live at the top of `components/dataset.py`. I can add support for a per-dataset `.csv` file later, which would override any hard-coded class specifications.
  - Defaults are set to match earlier papers / repos where applicable.
  - Every run is accompanied by a `.hydra/config.yaml` file, to aid in reproducibility during future runs
+ - Every run records the git commit and whether or not the repo was dirty at the time (`git.json` and `metrics.json` for scoring)
 
 *\* Subjective*
