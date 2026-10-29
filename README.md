@@ -172,7 +172,7 @@ Evaluation of a whole sweep will score any `*-best.pt` files contained in the `f
 
 ## Summarizing results
 
-**Example summarization**: `python -m tools.summarize folder=checkpoints/sweeps/<timestamp>/`
+**Example summarization**: `python summarize.py folder=checkpoints/sweeps/<timestamp>/`
 
 Takes a set of scored runs (as a result of automatic evaluation from `train.py` or manually via `evaluate.py`), reads the corresponding `metrics.json` for each run, groups runs that differ in seed only, and reports the mean ± standard deviation across stats for those runs. Prints one table per scored crop + split. Writes output to `<folder>/summary/summary.json` and `<folder>/summary/summarize.log`. The log holds the same table that's printed to the console.
 
@@ -208,15 +208,15 @@ Create `conf/crop/<crop>.yaml` with `name` and `train_crop`, following `tomato.y
 *See `components/transforms.py`*
 
 ## Repo Contents
-| File                        | Contents                                                                                                              |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `components/`               | Losses, metrics, optimizers, transforms, and scoring logic                             |
-| `conf/`                     | Hydra configs                               |
-| `models/`                   | Model wrappers and sizing helpers                                                                            |
-| `tools/`                    | Checks and                                                                        |
-| `dataset.py`                | Finds images and their corresponding labels, loads them, ensures they match                                           |
-| `evaluate.py`               | Evaluation logic and loop, this is what you run to evaluate the models                                                |
-| `train.py`                  | Training logic and loop, this is what you run to train the models                                                     |
+| File           | Contents                                                                                                   |
+| -------------- | ---------------------------------------------------------------------------------------------------------- |
+| `components/`  | Losses, metrics, optimizers, transforms, dataset definition, and scoring logic                             |
+| `conf/`        | Hydra configs                                                                                              |
+| `models/`      | Model wrappers and sizing helpers                                                                          |
+| `tools/`       | One-off checks                                                                                             |
+| `evaluate.py`  | Evaluation logic and loop, this is what you run to evaluate the models                                     |
+| `summarize.py` | Summarizes metrics for a given directory containing one or more metrics.json file(s) anywhere inside of it |
+| `train.py`     | Training logic and loop, this is what you run to train the models                                          |
 
 ## Design decisions, or alternatively "Why would you rebuild a perfectly good* tool?"
 
