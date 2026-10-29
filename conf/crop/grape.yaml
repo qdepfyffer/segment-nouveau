@@ -1,0 +1,2 @@
+name: grape
+train_crop: [768, 576]
