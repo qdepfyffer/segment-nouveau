@@ -224,7 +224,7 @@ Create `conf/crop/<crop>.yaml` with `name` and `train_crop`, following `tomato.y
  - When a model is run, images are padded out to clean multiples of a size specified by the model implementation. This padding uses mirroring rather than black pixels. Never pad with black. With the default training crop behavior, this only affects validation and testing
  - Validation images handled with a batch size of 1. This is to allow for the differently sized images within the tomato dataset. Previous implementations stretched everything to 512x512, so never had batches of mixed sizes.
  - This suite works out of the box with the canonical CIWA+ dataset. You shouldn't have to reorganize any files. If you still want to use the old dataset layout from the other repos, I plan to add support for that eventually.
- - No need for per-dataset files containing classes. It was the same file in every dataset, so the class specifications now live at the top of dataset.py. I can add support for a per-dataset `.csv` file later, which would override any hard-coded class specifications.
+ - No need for per-dataset files containing classes. It was the same file in every dataset, so the class specifications now live at the top of `components/dataset.py`. I can add support for a per-dataset `.csv` file later, which would override any hard-coded class specifications.
  - Defaults are set to match earlier papers / repos where applicable.
  - Every run is accompanied by a `.hydra/config.yaml` file, to aid in reproducibility during future runs
 
