@@ -1,0 +1,22 @@
+# This completely replaces Hydra's defauly logging config so it has to be thorough
+version: 1
+formatters:
+  console:
+    format: "[%(asctime)s][%(name)s][%(levelname)s] - %(message)s"
+    datefmt: "%H:%M:%S"   # Short time in the console - run folders are already named by date/time
+  file:
+    format: "[%(asctime)s][%(name)s][%(levelname)s] - %(message)s"   # Full date and ms in log files
+handlers:
+  console:
+    class: logging.StreamHandler
+    formatter: console
+    stream: ext://sys.stdout
+  file:
+    class: logging.FileHandler
+    formatter: file
+    filename: ${hydra.runtime.output_dir}/${hydra.job.name}.log
+    mode: w   # Overwrite the log on each run instead of appending
+root:
+  level: INFO
+  handlers: [console, file]
+disable_existing_loggers: false

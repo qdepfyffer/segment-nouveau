@@ -1,9 +1,10 @@
 """
 ADDING A LOSS FUNCTION:
-Any loss functions you want to add should be created as a function (or class, see CEDiceLoss) in this file and then
-imported to wherever it is being used. Loss functions, for the purpose of this suite, need to take logits of shape
-[batch_size, num_classes, height, width], masks of shape [batch_size, height, width], should ignore pixels equal to
-IGNORE_INDEX, and should return a single number representing the loss
+Any loss functions you want to add should be created as a function (or class, see CEDiceLoss) in this file. 
+Loss functions, for the purpose of this suite, need to take logits of shape [batch_size, num_classes, height, width], 
+masks of shape [batch_size, height, width], should ignore pixels equal to IGNORE_INDEX, and should return a single 
+number representing the loss. It needs to be added to the LOSSES registry and have a corresponding <loss_fn_name>.yaml file 
+created under conf/loss/
 """
 
 import torch
@@ -70,14 +71,27 @@ class CEDiceLoss:
             raise ValueError("Loss requires at least one non-ignored pixel")
         return self.cross_entropy(logits, masks) + self.dice_weight * _dice_loss(logits, masks)
 
+# Registry for loss functions - if you add a loss function, it needs an entry here - <name>: loss_fn, where <name> is the corresponding name in the Hydra config for the loss function.
+LOSSES = {
+    "ce": cross_entropy_loss,
+    "ce_dice": CEDiceLoss,
+}
 
-def build_loss(dice_weight: float):
+def build_loss(loss_cfg):
     """
-    Returns the combined dice loss function if dice_weight is anything but 0, otherwise returns simple cross entropy loss function
-    :param dice_weight: The weight to be used in the combined loss calculation
-    :return:            Either simple cross-entropy loss or combined cross-entropy + dice_weight * dice_loss
+    Returns the loss function based on the passed loss_cfg.
+    :param loss_cfg:    The loss cfg to be used to build the loss function
+    :raises ValueError: Raises ValueError if loss_cfg.name isn't an entry in the LOSSES registry
+    :return:            The built loss function
     """
-    if dice_weight == 0.0:
-        return cross_entropy_loss()
-    else:
-        return CEDiceLoss(dice_weight)
+
+    # Raise an error if we get an invalid loss_cfg
+    if loss_cfg.name not in LOSSES:
+        raise ValueError(f"{loss_cfg.name} not found in list of valid losses: {sorted(LOSSES)}")
+
+    # Otherwise retrieve the options from the loss_cfg
+    options = {key: value for key, value in loss_cfg.items() if key != "name"}
+
+    # Return the built loss function using the unpacked options
+    return LOSSES[loss_cfg.name](**options)
+

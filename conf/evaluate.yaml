@@ -1,5 +1,6 @@
 defaults:
   - crop: ???     # The crop to evaluate
+  - override hydra/job_logging: custom
   - _self_
 
 folder: ???       # A training run folder, or any folder containing training runs
@@ -15,7 +16,3 @@ hydra:
   sweep:
     dir: ${folder}/eval
     subdir: ${crop.name}-${split}
-  job_logging:
-    handlers:
-      file:
-        mode: w   # Overwrite the log on each run instead of appending

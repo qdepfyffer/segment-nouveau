@@ -90,7 +90,7 @@ def main(cfg: DictConfig) -> None:
 
     # Set optimizer and loss function
     optimizer = build_optimizer(cfg.optimizer, model.parameters(), cfg.lr)
-    loss_fn = build_loss(cfg.dice_weight)
+    loss_fn = build_loss(cfg.loss)
 
     # Initialize best_value to negative infinity, we use a higher-is-better approach for monitoring model performance
     # Loss will need to be negated during the training for this calculation

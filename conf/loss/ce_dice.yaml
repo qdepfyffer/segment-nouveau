@@ -1,0 +1,2 @@
+name: ce_dice  # Cross-entropy + dice_weight * Dice
+dice_weight: 1.0
