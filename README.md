@@ -210,37 +210,12 @@ Create `conf/crop/<crop>.yaml` with `name` and `train_crop`, following `tomato.y
 ## Repo Contents
 | File                        | Contents                                                                                                              |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `components/`               | `__init__.py`, `losses.py`, `metrics.py`, `optimizers.py`, `scoring.py`, `transforms.py`                              |
-| `components/__init__.py`    | Empty                                                                                                                 |
-| `components/losses.py`      | Builder and implementations for the loss functions used during model training                                         |
-| `components/metrics.py`     | Functions needed for generation of model scores                                                                       |
-| `components/optimizers.py`  | Builder and implementations for the optimizers used during model training                                             |
-| `components/scoring.py`     | Functions to load checkpoints, score splits, and write `metrics.json`                                                 |
-| `components/transforms.py`  | Builder and implementations for any transforms used during model training or evaluation                               |
-| `conf/`                     | `crop/`, `model/`, `check_sizing.yaml`, `evaluate.yaml`, `summarize.yaml`, `train.yaml`                               |
-| `conf/crop/`                | `pistachio.yaml`, `tomato.yaml`                                                                                       |
-| `conf/crop/pistachio.yaml`  | Hydra config file for pistachio specific settings                                                                     |
-| `conf/crop/tomato.yaml`     | Hydra config file for tomato specific settings                                                                        |
-| `conf/model/`               | `deeplabv3.yaml`                                                                                                      |
-| `conf/model/deeplabv3.yaml` | Hydra config file for DeepLabV3 specific settings                                                                     |
-| `conf/check_sizing.yaml`    | Hydra config file for `check_sizing.py`                                                                               |
-| `conf/evaluate.yaml`        | Hydra config file for `evaluate.py`                                                                                   |
-| `conf/summarize.yaml`       | Hydra config file for `tools/summarize.py`                                                                            |
-| `conf/train.yaml`           | Hydra config file for `train.py`                                                                                      |
-| `models/`                   | `__init__.py`, `deeplabv3.py`, `sizing.py`                                                                            |
-| `models/__init__.py`        | Dictionary of available models and a model builder function                                                           |
-| `models/deeplabv3.py`       | Implementation of the DeepLabV3 model with a MobileNetV3 backbone                                                     |
-| `models/sizing.py`          | Function to pad a batch of images on the right/bottom via reflection so height and width cleanly divide by `multiple` |
-| `tools/`                    | `__init__.py`, `check_env.py`, `check_sizing.py`, `summarize.py`                                                      |
-| `tools/__init__.py`         | Empty                                                                                                                 |
-| `tools/check_env.py`        | Script to run a few commands to validate installation of PyTorch                                                      |
-| `tools/check_sizing.py`     | Script to check whether or not a model's sizing is set correctly, and whether it can tolerate black padding           |
-| `tools/summarize.py`        | Summarizes metrics for a given directory containing one or more metrics.json file(s) in itself or subdirectories.     |
+| `components/`               | Losses, metrics, optimizers, transforms, and scoring logic                             |
+| `conf/`                     | Hydra configs                               |
+| `models/`                   | Model wrappers and sizing helpers                                                                            |
+| `tools/`                    | Checks and                                                                        |
 | `dataset.py`                | Finds images and their corresponding labels, loads them, ensures they match                                           |
 | `evaluate.py`               | Evaluation logic and loop, this is what you run to evaluate the models                                                |
-| `README.md`                 | What you're reading now.                                                                                              |
-| `requirements.txt`          | Non-torch project requirements                                                                                        |
-| `requirements-torch.txt`    | Torch-specific project requirements                                                                                   |
 | `train.py`                  | Training logic and loop, this is what you run to train the models                                                     |
 
 ## Design decisions, or alternatively "Why would you rebuild a perfectly good* tool?"

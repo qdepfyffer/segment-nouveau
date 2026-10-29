@@ -8,7 +8,7 @@ IGNORE_INDEX, and should return a single number representing the loss
 
 import torch
 
-from dataset import IGNORE_INDEX
+from components.dataset import IGNORE_INDEX
 
 
 def cross_entropy_loss():

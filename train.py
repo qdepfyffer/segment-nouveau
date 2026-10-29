@@ -14,12 +14,13 @@ from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from components.git_info import git_info
 from components.losses import build_loss
 from components.metrics import confusion_counts, scores_from_counts
 from components.optimizers import build_optimizer
 from components.scoring import load_checkpoint, score_run
 from components.transforms import training_transform
-from dataset import SegmentationDataset
+from components.dataset import SegmentationDataset
 from models import build_model
 
 # Set up logging
@@ -63,6 +64,17 @@ def main(cfg: DictConfig) -> None:
     out_dir = Path(HydraConfig.get().runtime.output_dir)
     best_model_path = out_dir / f"{cfg.model.name}-best.pt"
 
+    # Capture current git repo commit hash and whether or not the repo is dirty (uncommitted changes)
+    revision = git_info()
+    log.info(f"Current revision: {revision['commit']}, uncommitted changes: {revision['dirty']}")
+    if revision["dirty"]:
+        # Log this warning so it's explicitly clear this run (likely) won't be reproducible with the code corresponding to the current commit hash
+        log.warning("Current repo has uncommitted changes. The commit hash alone does not describe this run's code.")
+
+    # Store a .json file holding the current revision information
+    with open(out_dir / "git.json", "w") as file:
+        json.dump(revision, file, indent=4)
+
     # Build specified model
     model = build_model(cfg.model.name, num_classes=2)
     model = model.to(cfg.device)  # Move model to specified device
@@ -93,7 +105,7 @@ def main(cfg: DictConfig) -> None:
         total_train_loss = 0.0
         for images, masks in tqdm(train_loader, desc=f"[TRAIN] Epoch {epoch + 1}"):
 
-            # Put images and masks on GPU
+            # Put images and masks on specified device
             images = images.to(cfg.device)
             masks = masks.to(cfg.device)
 
@@ -127,7 +139,7 @@ def main(cfg: DictConfig) -> None:
         with torch.no_grad():
             for images, masks in tqdm(valid_loader, desc=f"[VALID] Epoch {epoch + 1}"):
 
-                # Put images and masks on GPU
+                # Put images and masks on specified device
                 images = images.to(cfg.device)
                 masks = masks.to(cfg.device)
 

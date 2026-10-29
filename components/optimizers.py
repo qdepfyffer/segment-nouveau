@@ -5,7 +5,6 @@ To add a new optimizer, add its name to the OPTIMIZERS list below and a correspo
 
 import torch
 
-
 OPTIMIZERS = ["adamw", "rmsprop"]
 
 

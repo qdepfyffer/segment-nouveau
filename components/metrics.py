@@ -2,7 +2,7 @@
 Contains implementations for model scoring and evaluation
 """
 
-from dataset import IGNORE_INDEX
+from components.dataset import IGNORE_INDEX
 
 
 def _safe_div(top: float, bottom: float) -> float:

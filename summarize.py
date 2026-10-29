@@ -15,13 +15,13 @@ from omegaconf import DictConfig
 # Set up logging
 log = logging.getLogger(__name__)
 
-@hydra.main(config_path="../conf", config_name="summarize", version_base="1.3")
+@hydra.main(config_path="conf", config_name="summarize", version_base="1.3")
 def main(cfg: DictConfig):
 
     # Find all `metrics.json` files for a given sweep
     metrics_paths = sorted(Path(cfg.folder).rglob("metrics.json"))
     count = len(metrics_paths)
-    log.info(f"Found {count} total metrics.json files in {cfg.folder}.")
+    log.info(f"Found {count} total metrics.json file(s) in {cfg.folder}.")
     if count == 0:
         log.warning(f"No metrics.json files found under {cfg.folder}. Please make sure you've provided a folder containing at least one metrics.json file.")
         return

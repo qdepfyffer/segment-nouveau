@@ -11,8 +11,9 @@ from omegaconf import OmegaConf
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from components.dataset import SegmentationDataset
+from components.git_info import git_info
 from components.metrics import confusion_counts, scores_from_counts
-from dataset import SegmentationDataset
 from models import build_model
 
 # Set up logging
@@ -126,6 +127,7 @@ def score_run(model, settings, data_root, crop, split, out_dir):
     eval_metrics = {
         "model": OmegaConf.to_container(settings),
         "evaluation": {
+            "code": git_info(),
             "data_root": str(dataset_root),
             "crop": crop,
             "split": split,
