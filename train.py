@@ -20,6 +20,7 @@ from components.inference import predict_logits
 from components.losses import build_loss
 from components.metrics import confusion_counts, scores_from_counts
 from components.optimizers import build_optimizer
+from components.progress import bar_desc
 from components.scoring import load_checkpoint, score_run
 from components.transforms import build_training_transform
 from models import build_model
@@ -104,7 +105,7 @@ def main(cfg: DictConfig) -> None:
     for epoch in range(cfg.epochs):
         # Training loop
         total_train_loss = 0.0
-        for images, masks in tqdm(train_loader, desc=f"[TRAIN] Epoch {epoch + 1}"):
+        for images, masks in tqdm(train_loader, desc=bar_desc(log, f"[TRAIN] Epoch {epoch + 1}")):
 
             # Put images and masks on specified device
             images = images.to(cfg.device)
@@ -138,7 +139,7 @@ def main(cfg: DictConfig) -> None:
 
         model.eval()
         with torch.no_grad():
-            for images, masks in tqdm(valid_loader, desc=f"[VALID] Epoch {epoch + 1}"):
+            for images, masks in tqdm(valid_loader, desc=bar_desc(log, f"[VALID] Epoch {epoch + 1}")):
 
                 # Put images and masks on specified device
                 images = images.to(cfg.device)

@@ -15,6 +15,7 @@ from components.dataset import SegmentationDataset
 from components.git_info import git_info
 from components.inference import predict_logits
 from components.metrics import confusion_counts, scores_from_counts
+from components.progress import bar_desc
 from models import build_model
 
 # Set up logging
@@ -71,7 +72,7 @@ def count_split(model, loader, sizing, prepare=None):
 
     # Begin evaluation
     with torch.no_grad():
-        for images, masks in tqdm(loader, desc="[EVAL]  Progress"):
+        for images, masks in tqdm(loader, desc=bar_desc(log, "[EVAL]  Progress")):
             # Put images and masks on the same device as the model
             images = images.to(device)
             masks = masks.to(device)
