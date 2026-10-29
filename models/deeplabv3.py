@@ -2,7 +2,7 @@ from torch import nn
 from torchvision.models import MobileNet_V3_Large_Weights
 from torchvision.models.segmentation import deeplabv3_mobilenet_v3_large
 
-from models.sizing import pad_to_multiple
+from models.padding import pad_to_multiple
 
 
 class DeepLabV3MobileNet(nn.Module):
