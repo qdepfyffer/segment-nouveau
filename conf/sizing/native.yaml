@@ -1,0 +1,1 @@
+name: native  # Training: random crop corresponding to crop.train_crop. Validation/scoring: proceeds with each image at its own size

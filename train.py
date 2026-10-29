@@ -19,7 +19,7 @@ from components.losses import build_loss
 from components.metrics import confusion_counts, scores_from_counts
 from components.optimizers import build_optimizer
 from components.scoring import load_checkpoint, score_run
-from components.transforms import training_transform
+from components.transforms import build_training_transform
 from components.dataset import SegmentationDataset
 from models import build_model
 
@@ -81,7 +81,7 @@ def main(cfg: DictConfig) -> None:
 
     # Load our datasets
     train_ds = SegmentationDataset(Path(cfg.data_root), cfg.crop.name, "train",
-                                   transform=training_transform(cfg.crop.train_crop[0], cfg.crop.train_crop[1]))
+                                   transform=build_training_transform(cfg.sizing, cfg.crop.train_crop))
     valid_ds = SegmentationDataset(Path(cfg.data_root), cfg.crop.name, "valid")
     train_loader = DataLoader(train_ds, batch_size=cfg.batch_size, shuffle=True, drop_last=True)
     valid_loader = DataLoader(valid_ds, batch_size=1)  # Validate with a batch size of 1 so images don't need to be the same size

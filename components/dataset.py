@@ -120,7 +120,7 @@ class SegmentationDataset(Dataset):
 
 
     Example usage:
-    ds = SegmentationDataset(data_root, "tomato", "train", transform=training_transform(256, 480))
+    ds = SegmentationDataset(data_root, "tomato", "train", transform=rand_crop_transform(256, 480))
     image, mask = ds[0]
     """
 

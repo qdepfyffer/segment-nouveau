@@ -1,0 +1,2 @@
+name: stretch     # Every image resized to <size> for training, validation, and scoring
+size: [512, 512]  # Height, width. Predictions get resized to the image's native size before being scored

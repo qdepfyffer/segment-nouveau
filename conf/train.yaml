@@ -1,6 +1,7 @@
 defaults:
   - crop: ???           # '???' here means it MUST be supplied by the user in the command line
-  - model: deeplabv3
+  - model: deeplabv3    
+  - sizing: native      # How should images be sized before being fed to the model
   - _self_
 
 data_root: ???          # Root dataset directory
