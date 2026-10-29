@@ -92,12 +92,13 @@ def count_split(model, loader, sizing, prepare=None):
     return totals
 
 
-def score_run(model, settings, data_root, crop, split, out_dir):
+def score_run(model, settings, data_root, crop, split, out_dir, num_workers):
     """
     Scores a model with the given settings over the dataset specified by data_root, crop, and split - results saved to out_dir
     :param model:       The model to be evaluated
     :param settings:    The model's training config as returned by load_checkpoint()
     :param data_root:   The root directory holding the datasets
+    :param num_workers: Number of workers for parallel data loading
     :param crop:        Which crop is being used in evaluation  
     :param split:       Which split the model is being evaluated against 
     :param out_dir:     The output directory for model metrics
@@ -110,7 +111,7 @@ def score_run(model, settings, data_root, crop, split, out_dir):
     # Load and build scoring dataset (batch size 1 lets us score every image at native resolution)
     dataset_root = Path(data_root) if data_root is not None else Path(settings.data_root)
     eval_ds = SegmentationDataset(dataset_root, crop, split)
-    eval_loader = DataLoader(eval_ds, batch_size=1)
+    eval_loader = DataLoader(eval_ds, num_workers=num_workers, batch_size=1)
 
     # Calculate total tp/fp/fn/tn counts
     totals = count_split(model, eval_loader, settings.sizing)

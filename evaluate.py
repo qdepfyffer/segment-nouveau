@@ -54,7 +54,7 @@ def main(cfg: DictConfig):
             model, settings = load_checkpoint(run, cfg.device)
 
             # Score the run
-            score_run(model, settings, cfg.data_root, cfg.crop.name, cfg.split, run_out)
+            score_run(model, settings, cfg.data_root, cfg.crop.name, cfg.split, run_out, num_workers=cfg.num_workers)
 
             # Free memory before we start the next run otherwise bigger models are going to hurt
             del model, settings

@@ -16,6 +16,7 @@ output_dir: checkpoints # Where train.py should output to
 seed: 42                # Random seed for the training process
 eval_splits: [test]     # The splits to score with the best model - [] for none
 device: cuda            # cuda, cuda:<n> for a specific GPU, or cpu
+num_workers: 4          # Number of processes for parallel loading of examples
 
 
 # Determines where the outputs go - ${var} references variables from the hydra config
@@ -28,7 +29,7 @@ hydra:
   job:
     config:
       override_dirname:
-        exclude_keys: [data_root, crop, output_dir, device]
+        exclude_keys: [data_root, crop, output_dir, device, num_workers]  # Any key that isn't an experimental setting (where things get put, which device, how fast data loads, etc)
         kv_sep: "-"
         item_sep: "+"
   job_logging:

@@ -85,8 +85,8 @@ def main(cfg: DictConfig) -> None:
     train_ds = SegmentationDataset(Path(cfg.data_root), cfg.crop.name, "train",
                                    transform=build_training_transform(cfg.sizing, cfg.crop.train_crop))
     valid_ds = SegmentationDataset(Path(cfg.data_root), cfg.crop.name, "valid")
-    train_loader = DataLoader(train_ds, batch_size=cfg.batch_size, shuffle=True, drop_last=True)
-    valid_loader = DataLoader(valid_ds, batch_size=1)  # Validate with a batch size of 1 so images don't need to be the same size
+    train_loader = DataLoader(train_ds, num_workers=cfg.num_workers, batch_size=cfg.batch_size, shuffle=True, drop_last=True)
+    valid_loader = DataLoader(valid_ds, num_workers=cfg.num_workers, batch_size=1)  # Validate with a batch size of 1 so images don't need to be the same size
 
     # Set optimizer and loss function
     optimizer = build_optimizer(cfg.optimizer, model.parameters(), cfg.lr)
@@ -218,7 +218,7 @@ def main(cfg: DictConfig) -> None:
             return
         model, settings = load_checkpoint(out_dir, cfg.device)
         for split in eval_splits:
-            score_run(model, settings, None, cfg.crop.name, split, out_dir / "eval" / f"{cfg.crop.name}-{split}")
+            score_run(model, settings, None, cfg.crop.name, split, out_dir / "eval" / f"{cfg.crop.name}-{split}", num_workers=cfg.num_workers)
     except Exception:
         log.exception("Automatic scoring failed - training results intact, score them with evaluate.py")
 

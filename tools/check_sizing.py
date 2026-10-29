@@ -50,7 +50,7 @@ def main(cfg: DictConfig):
     # Load and build scoring dataset (batch size 1 lets us score every image at native resolution)
     dataset_root = Path(cfg.data_root) if cfg.data_root is not None else Path(settings.data_root)
     eval_ds = SegmentationDataset(dataset_root, cfg.crop.name, cfg.split)  # Split comes from conf/check_sizing.yaml (valid by default)
-    eval_loader = DataLoader(eval_ds, batch_size=1)
+    eval_loader = DataLoader(eval_ds, num_workers=cfg.num_workers, batch_size=1)
 
     # Dictionary for pad variants
     variants = {
