@@ -20,9 +20,9 @@ import torch
 from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 
+from components.dataset import SegmentationDataset
 from components.metrics import scores_from_counts
 from components.scoring import count_split, load_checkpoint
-from components.dataset import SegmentationDataset
 from models.padding import pad_to_multiple
 
 
@@ -42,6 +42,11 @@ def main(cfg: DictConfig):
     # Load the model
     model, settings = load_checkpoint(Path(cfg.checkpoint), cfg.device)
 
+    # There's no point in checking sizing if the model was trained using a stretch transform since it tests padding at the native image size
+    if settings.sizing.name != "native":  # If you add some other non-stretch transform you might need to edit this to allow check_sizing to work with it
+        log.warning(f"check_sizing.py only tests at native sizing, and this model was trained with {settings.sizing.name}")
+        return
+
     # Load and build scoring dataset (batch size 1 lets us score every image at native resolution)
     dataset_root = Path(cfg.data_root) if cfg.data_root is not None else Path(settings.data_root)
     eval_ds = SegmentationDataset(dataset_root, cfg.crop.name, cfg.split)  # Split comes from conf/check_sizing.yaml (valid by default)
@@ -56,7 +61,7 @@ def main(cfg: DictConfig):
 
     # Run evals
     for name, prepare in variants.items():
-        totals = count_split(model, eval_loader, prepare)
+        totals = count_split(model, eval_loader, settings.sizing, prepare)
         scores = scores_from_counts(**totals)
         log.info(f"{name:30s} sunlit IoU: {scores['sunlit_iou']:.4f}")
 

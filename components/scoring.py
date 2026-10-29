@@ -13,6 +13,7 @@ from tqdm import tqdm
 
 from components.dataset import SegmentationDataset
 from components.git_info import git_info
+from components.inference import predict_logits
 from components.metrics import confusion_counts, scores_from_counts
 from models import build_model
 
@@ -48,11 +49,12 @@ def load_checkpoint(checkpoint_dir: Path, device):
     return model, settings
 
 
-def count_split(model, loader, prepare=None):
+def count_split(model, loader, sizing, prepare=None):
     """
     Runs the model on every image in the loader and returns summed tp/fp/fn/tn counts
     :param model:   The model to be run
     :param loader:  The DataLoader that will feed the model
+    :param sizing:  The sizing to be used for running inference (should match what the model was trained with)
     :param prepare: Optional function that gets applied to each image batch before being passed to the model (leave as None if you aren't absolutely sure you want something here)
     :return:        A dictionary holding summed tp/fp/fn/tn counts
     """
@@ -79,7 +81,7 @@ def count_split(model, loader, prepare=None):
                 images = prepare(images)
 
             # Run the model and get concrete predictions
-            predictions = model(images).argmax(dim=1)[..., :height, :width]
+            predictions = predict_logits(model, images, sizing).argmax(dim=1)[..., :height, :width]
 
             # Get confusion counts, add to running total of each - see components/metrics.py for implementation
             current_conf = confusion_counts(predictions, masks)
@@ -110,7 +112,7 @@ def score_run(model, settings, data_root, crop, split, out_dir):
     eval_loader = DataLoader(eval_ds, batch_size=1)
 
     # Calculate total tp/fp/fn/tn counts
-    totals = count_split(model, eval_loader)
+    totals = count_split(model, eval_loader, settings.sizing)
 
     # Score the model once with totals
     # By default models are scored at native label resolution with no crop or resize
@@ -132,7 +134,8 @@ def score_run(model, settings, data_root, crop, split, out_dir):
             "crop": crop,
             "split": split,
             "images": len(eval_ds),
-            "pixels": sum(totals.values())
+            "pixels": sum(totals.values()),
+            "sizing": OmegaConf.to_container(settings.sizing),
         },
         "metrics": {
             "counts": totals,
