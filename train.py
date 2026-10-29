@@ -14,13 +14,14 @@ from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from components.dataset import SegmentationDataset
 from components.git_info import git_info
+from components.inference import predict_logits
 from components.losses import build_loss
 from components.metrics import confusion_counts, scores_from_counts
 from components.optimizers import build_optimizer
 from components.scoring import load_checkpoint, score_run
 from components.transforms import build_training_transform
-from components.dataset import SegmentationDataset
 from models import build_model
 
 # Set up logging
@@ -109,7 +110,7 @@ def main(cfg: DictConfig) -> None:
             images = images.to(cfg.device)
             masks = masks.to(cfg.device)
 
-            logits = model(images)
+            logits = model(images)  # We don't need to use predict_logits logic here because images have already been transformed, so predict_logits would essentially be a no-op here
             optimizer.zero_grad()
             loss = loss_fn(logits, masks)
             loss.backward()
@@ -144,7 +145,7 @@ def main(cfg: DictConfig) -> None:
                 masks = masks.to(cfg.device)
 
                 # Get model's predictions and calculate loss
-                logits = model(images)
+                logits = predict_logits(model, images, cfg.sizing)
                 predictions = logits.argmax(dim=1)
                 loss = loss_fn(logits, masks)
                 total_valid_loss += loss.item()

@@ -20,7 +20,7 @@ def rand_crop_transform(height: int, width: int) -> v2.Compose:
         v2.RandomHorizontalFlip(p=0.5),
     ])
 
-def stretch_transform(height: int, width: int) -> v2.Compose:  # If you add a different stretch transform just rename this one and all of its references to stretch512 or something, and name the new one stretch<number>.
+def stretch_transform(height: int, width: int) -> v2.Compose:  
     """
     Optional transform for the dataset - resizes the image to the specified size and randomly mirrors it horizontally w/ p=0.5
     :param height:  Height to stretch the image to

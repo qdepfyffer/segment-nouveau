@@ -210,9 +210,9 @@ Create `conf/crop/<crop>.yaml` with `name` and `train_crop`, following `tomato.y
 ## Repo Contents
 | File           | Contents                                                                                                   |
 | -------------- | ---------------------------------------------------------------------------------------------------------- |
-| `components/`  | Losses, metrics, optimizers, transforms, dataset definition, and scoring logic                             |
+| `components/`  | Losses, metrics, optimizers, transforms, dataset definition, inference and scoring logic                   |
 | `conf/`        | Hydra configs                                                                                              |
-| `models/`      | Model wrappers and sizing helpers                                                                          |
+| `models/`      | Model wrappers and padding helper                                                                          |
 | `tools/`       | One-off checks                                                                                             |
 | `evaluate.py`  | Evaluation logic and loop, this is what you run to evaluate the models                                     |
 | `summarize.py` | Summarizes metrics for a given directory containing one or more metrics.json file(s) anywhere inside of it |
