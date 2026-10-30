@@ -30,6 +30,6 @@ hydra:
   job:
     config:
       override_dirname:
-        exclude_keys: [data_root, crop, output_dir, device, num_workers]  # Any key that isn't an experimental setting (where things get put, which device, how fast data loads, etc)
+        exclude_keys: [data_root, crop, output_dir, device, num_workers, eval_splits]  # Any key that isn't an experimental setting (where things get put, which device, how fast data loads, etc)
         kv_sep: "-"
         item_sep: "+"
