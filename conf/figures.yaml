@@ -1,0 +1,10 @@
+defaults:
+  - override hydra/job_logging: custom  # Use the custom logging override 
+  - _self_
+
+folder: ???         # Folder must be specified
+metric: sunlit_iou  # Default metric
+
+hydra:
+  run:
+    dir: ${folder}/figures
