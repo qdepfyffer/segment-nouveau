@@ -190,6 +190,23 @@ Takes a set of scored runs (as a result of automatic evaluation from `train.py` 
 | `folder`  | A sweep, crop folder inside a sweep, or any folder containing runs - Required | `folder=checkpoints/sweeps/2026-10-22_18-02-44` |
 | `metrics` | Which scores to show, default is all 8                                        | `'metrics=[sunlit_iou,f1]'`                     |
 
+## Generating figures
+
+**Example generation for a sweep**: `python figures.py folder=checkpoints/sweeps/<timestamp>/ metric=precision`
+
+**Example generation for a single run**: `python figures.py folder=checkpoints/<crop>/<timestamp>/ metric=precision`
+
+To generate figures, the script reads `history.json` from the model's training to generate `curves.png` plotting metrics against epochs. It also reads `eval/*/metrics.json` from the model evaluation to generate confusion matrices, one per scored split, output as `confusion-<crop>-<split>.png`. Finally it reads `summary/summary.json` from the summarization script to output one `comparison-<crop>-<split>.png` per section. If `summary.json` is missing, it will log a message telling you to run `summarize.py` first. Runs without a `history.json` won't be found (so won't have confusion matrices generated), but missing files in general will not result in an error.B
+
+Everything output by `figures.py` goes in `<folder>/figures/`, where per-run figures mirror the run folder layout with `figures.log` next to them. Re-running the script overwrites existing figures, so they will reflect the last `metric` used when running it.
+
+*Note: The dashed line on the curve marks the saved (best according to `monitor` value used in training) epoch. It won't necessarily be at the peak of the `metric` being plotted, unless it matches the `monitor` value. Also, confusion matrices show percentages as a share of all pixels in the split with a fixed color scale so shades are comparable across figures. The titles for confusion matrices will always show `sunlit IoU` regardless of `metric`*
+
+| Argument | Description                                                                                                                                                                                     | Example                                         |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `folder` | A sweep, crop folder inside a sweep, or any folder containing runs - Required                                                                                                                   | `folder=checkpoints/sweeps/2026-10-22_18-02-44` |
+| `metric` | Which metric to use for the curves and comparison charts - Default is `sunlit_iou`, must be one of [`accuracy`, `precision`, `recall`, `fpr`, `f1`, `sunlit_iou`, `non_sunlit_iou`, `mean_iou`] | `metric=f1`                                     |
+
 ## Extending the suite
 
 ### Adding a new model
@@ -234,6 +251,7 @@ Create `conf/crop/<crop>.yaml` with `name` and `train_crop`, following `tomato.y
 | `models/`      | Model wrappers and padding helper                                                                          |
 | `tools/`       | One-off checks                                                                                             |
 | `evaluate.py`  | Evaluation logic and loop, this is what you run to evaluate the models                                     |
+| `figures.py`   | Figure generation for scored and summarized runs                                                           |
 | `summarize.py` | Summarizes metrics for a given directory containing one or more metrics.json file(s) anywhere inside of it |
 | `train.py`     | Training logic and loop, this is what you run to train the models                                          |
 

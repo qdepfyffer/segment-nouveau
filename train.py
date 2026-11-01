@@ -175,10 +175,13 @@ def main(cfg: DictConfig) -> None:
         if cfg.monitor == "valid_loss":
             current_value = -current_value
 
-        log.info(f"[VALID] Loss: {valid_loss:.4f}")
-        log.info(f"[VALID] Sunlit IOU: {scores['sunlit_iou']:.4f}\tMean IOU: {scores['mean_iou']:.4f}")
-        log.info(f"[VALID] Precision: {scores['precision']:.4f}\tAccuracy: {scores['accuracy']:.4f}")
-        log.info(f"[VALID] Recall: {scores['recall']:.4f}\t\tF1: {scores['f1']:.4f}")
+        # The formatting was bugging me so this will make things look a little better hopefully
+        PAD_VALUE = 15
+
+        log.info(f"[VALID] {'Loss:':<{PAD_VALUE}} {valid_loss:.4f}\t{'Mean IoU:':<{PAD_VALUE}} {scores['mean_iou']:.4f}")
+        log.info(f"[VALID] {'Sunlit IoU:':<{PAD_VALUE}} {scores['sunlit_iou']:.4f}\t{'Non-Sunlit IoU:':<{PAD_VALUE}} {scores['non_sunlit_iou']:.4f}")
+        log.info(f"[VALID] {'Precision:':<{PAD_VALUE}} {scores['precision']:.4f}\t{'Accuracy:':<{PAD_VALUE}} {scores['accuracy']:.4f}")
+        log.info(f"[VALID] {'Recall:':<{PAD_VALUE}} {scores['recall']:.4f}\t{'F1:':<{PAD_VALUE}} {scores['f1']:.4f}")
 
         # Check if we've gotten a better score than our current best for the monitored value
         if current_value > best_value:
