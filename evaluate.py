@@ -7,12 +7,14 @@ from pathlib import Path
 
 import hydra
 from hydra.core.hydra_config import HydraConfig
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
-from components.scoring import load_checkpoint, score_run
+from components.scoring import load_checkpoint, run_folder, score_run
 
 # Set up logging
 log = logging.getLogger(__name__)
+
+OmegaConf.register_new_resolver("run_folder", lambda path: str(run_folder(Path(path))))
 
 @hydra.main(config_path="conf", config_name="evaluate", version_base="1.3")
 def main(cfg: DictConfig):
@@ -22,7 +24,7 @@ def main(cfg: DictConfig):
     log.info(f"Log for this evaluation: {out_dir}")
 
     # Find all checkpoint paths
-    checkpoint_paths = sorted(Path(cfg.folder).rglob("*-best.pt"))
+    checkpoint_paths = sorted(run_folder(Path(cfg.folder)).rglob("*-best.pt"))
     runs = [path.parent for path in checkpoint_paths]
 
     # Exit early if we can't find any valid runs

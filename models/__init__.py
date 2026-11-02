@@ -5,7 +5,7 @@ and add its name to the MODELS dictionary below. For an example (very simple) im
 short, the model's forward function must take a batch of images and return the logits with the shape [batch, classes, height, width].
 New models must also declare a size_multiple (use 32 if you're unsure), and must call pad_to_multiple in its forward function
 After creating the wrapper you need to also create a <model name>.yaml file under conf/model/, with at least `name: <model name>`
-After adding and training a new model, run `python -m tools.check_sizing checkpoint=<run folder> crop=<crop>` for each crop you plan to report
+After adding and training a new model, run `python -m tools.check_sizing checkpoint=<run> crop=<crop>` for each crop you plan to report
 """
 
 from models.deeplabv3 import DeepLabV3MobileNet

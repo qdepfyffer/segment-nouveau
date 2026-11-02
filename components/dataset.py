@@ -16,7 +16,7 @@ classes = [("Non-sunlit",(165, 42, 42)),
 IGNORE_INDEX = 255
 
 # Suffixes corresponding to valid image files
-IMAGE_SUFFIXES = {".jpg", ".jpeg"}
+IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".tif", ".tiff", }
 
 
 def _find_pairs(data_root: Path, crop: str, split: str) -> list[tuple[Path, Path]]:
@@ -77,7 +77,6 @@ def _label_stem(image_path: Path) -> str:
 
     # Return the fully-stripped stem
     return stem
-
 
 def load_image(image_path: Path) -> torch.Tensor:
     """

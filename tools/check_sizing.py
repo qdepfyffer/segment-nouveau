@@ -17,14 +17,15 @@ from pathlib import Path
 
 import hydra
 import torch
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 
 from components.dataset import SegmentationDataset
 from components.metrics import scores_from_counts
-from components.scoring import count_split, load_checkpoint
+from components.scoring import count_split, load_checkpoint, run_folder
 from models.padding import pad_to_multiple
 
+OmegaConf.register_new_resolver("run_folder", lambda path: str(run_folder(Path(path))))
 
 def pad_to_64(images):
     return pad_to_multiple(images, 64)  # Internal resizing of models commonly uses some power of 2, we use 64 because it's evenly divisible by 32, 16, 8, 4, and 2, so the model should handle it well

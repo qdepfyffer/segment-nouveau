@@ -21,24 +21,35 @@ from models import build_model
 # Set up logging
 log = logging.getLogger(__name__)
 
+def run_folder(checkpoint: Path) -> Path:
+    """
+    Accepts a run folder or .pt file inside a run folder and returns the run folder
+    :param checkpoint:  Either a run folder or a .pt file inside a run folder
+    :return:            The run folder
+    """
+
+    return checkpoint.parent if checkpoint.suffix == ".pt" else checkpoint
+
+
 # The below functions were pulled out so they could be imported and reused elsewhere because they implement patterns that get repeated in other files
-def load_checkpoint(checkpoint_dir: Path, device):
+def load_checkpoint(checkpoint: Path, device):
     """
     Reads config.yaml from a checkpoint's folder and rebuilds the model by loading the saved weights and moves the model to the specified device
-    :param checkpoint_dir:  Directory holding the checkpoint and the config.yaml that resulted in that set of weights
-    :param device:          The device the model should be moved to (cuda, cuda:n, cpu)
-    :return:                The rebuilt model and its training config
+    :param checkpoint:  Either the direct path to the checkpoint or the directory holding the checkpoint and the config.yaml that resulted in that set of weights
+    :param device:      The device the model should be moved to (cuda, cuda:n, cpu)
+    :return:            The rebuilt model and its training config
     """
     # Load saved settings
-    config_path = checkpoint_dir / ".hydra" / "config.yaml"
+    run = run_folder(checkpoint)
+    config_path = run / ".hydra" / "config.yaml"
     if not config_path.is_file():
-        raise FileNotFoundError(f"'config.yaml' not found at {config_path}.")
+        raise FileNotFoundError(f"'config.yaml' not found at {config_path}. The '.pt' file must stay inside its run folder.")
     settings = OmegaConf.load(config_path)
 
     # Get path to checkpoints & raise an error if they can't be found
-    checkpoint_path = checkpoint_dir / f"{settings.model.name}-best.pt"
+    checkpoint_path = checkpoint if checkpoint.suffix == ".pt" else run / f"{settings.model.name}-best.pt"
     if not checkpoint_path.is_file():
-        # We should only end up here if the checkpoints are missing but the settings aren't, which shouldn't ever happen
+        # We should only end up here if the .pt path doesn't exist or the run's checkpoint is missing
         raise FileNotFoundError(f"Model checkpoint could not be found at {checkpoint_path}. Please double check and try again.")
 
     # Build the model based on saved settings, move it to specified device
@@ -48,7 +59,6 @@ def load_checkpoint(checkpoint_dir: Path, device):
     model.eval()
 
     return model, settings
-
 
 def count_split(model, loader, sizing, prepare=None):
     """

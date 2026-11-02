@@ -12,7 +12,8 @@ num_workers: 4    # Number of processes for parallel loading of examples
 
 hydra:
   run:
-    dir: ${folder}/eval/${crop.name}-${split}
+    dir: ${run_folder:${folder}}/eval/${crop.name}-${split}
   sweep:
-    dir: ${folder}/eval
+    dir: ${run_folder:${folder}}/eval
     subdir: ${crop.name}-${split}
+    

@@ -5,7 +5,7 @@ defaults:
   - override hydra/job_logging: custom
   - _self_
 
-checkpoint: ???   # Training run folder, has .hydra/ and <model>-best.pt
+checkpoint: ???   # Training run folder or the .pt inside of it, has .hydra/ and <model>-best.pt
 split: valid      # Which split is being scored
 data_root: null   # null = use data_root from the model's cfg (which data_root the model was trained with)
 device: cuda      # cuda, cuda:<n> for a specific GPU, or cpu
@@ -13,5 +13,5 @@ num_workers: 4    # Number of processes for parallel loading of examples
 
 hydra:
   run:
-    dir: ${checkpoint}/eval/${crop.name}-${split}
+    dir: ${run_folder:${checkpoint}}/eval/${crop.name}-${split}
   output_subdir: .hydra-check_sizing
