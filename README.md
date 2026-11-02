@@ -15,6 +15,7 @@ For reference: This repo was built based on [AIISLab segment-main](https://githu
  - Each crop has its own `train_crop` value in `conf/crop/<crop>.yaml` which will need to be set for any crops added down the line.
  - This project uses [hydra](https://hydra.cc/) now, rather than argparse. This changes the way command line arguments are input (`arg=val` instead of `--arg val`) and adds some new functionalities.
  - When passing filepaths for the data_root parameter, use full paths; $HOME/... works, a bare ~/... doesn't.
+ - Scripts that work on one model take checkpoint (a run folder or the .pt inside it). Scripts that can work on many runs take folder (a single run, a crop folder, or a whole sweep).
 
 ## Dataset Requirements:  
 Your dataset should follow the example structure below. In short: One directory containing directories for each crop, each with their own test, train, and valid folders, with each split having a visual and label folder. Extra folders are ignored.
@@ -31,7 +32,7 @@ Images and their labels must be the same dimensions.
 data_root/  
 ├── almond  
 │   ├── test  
-│   │   ├── label  
+│   │   ├── label
 │   │   └── visual  
 │   ├── train  
 │   │   └── ...  
@@ -207,6 +208,24 @@ Everything output by `figures.py` goes in `<folder>/figures/`, where per-run fig
 | `folder` | A sweep, crop folder inside a sweep, or any folder containing runs - Required                                                                                                                   | `folder=checkpoints/sweeps/2026-10-22_18-02-44` |
 | `metric` | Which metric to use for the curves and comparison charts - Default is `sunlit_iou`, must be one of [`accuracy`, `precision`, `recall`, `fpr`, `f1`, `sunlit_iou`, `non_sunlit_iou`, `mean_iou`] | `metric=f1`                                     |
 
+## Predicting on new images
+
+**Example prediction (folder)**: `python predict.py checkpoint=checkpoints/<crop>/<timestamp>/ input=<path/to/input/images> save_logits=True save_overlays=False` 
+
+**Example prediction (single image)**: `python predict.py checkpoint=checkpoints/<crop>/<timestamp>/ input=<path/to/input/image.png> save_logits=False save_overlays=True`
+
+Outputs are saved to `<run>/predict/<timestamp>` with a `predict.log` file and organized into folders corresponding to what they are: `masks/`, `logits/`, `overlays/`. Masks use the label colors and are named `<stem>_pred.png` to line up with `<stem>_L.png`. The other two outputs follow a similar scheme, with `_pred.png` being replaced by `_logits.npy` and `_overlay.png`. The overlays themselves tint only pixels predicted as `sunlit`. Saving the optional outputs (logits and overlays) can result in many large files being saved to your disk (~12 MB for logits per almond/citrus/grape image in the CIWA+ dataset), so saving them defaults to False.
+
+*Note: Logits are saved as [2, H, W] float32, channel 0 non-sunlit, channel 1 sunlit - Outputs for models trained with stretch sizing are resized back to native size*
+
+| Argument        | Description                                                                                 | Example                                                               |
+| --------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `checkpoint`    | A run folder or the .pt file inside of it - Required                                        | `checkpoint=checkpoints/tomato/2026-10-22_18-02-44/deeplabv3-best.pt` |
+| `input`         | Either a single image or a folder containing images to generate predictions from - Required | `input=$HOME/dataset/tomato/test/visual`                              |
+| `save_logits`   | Whether logits should be saved with the predicted masks                                     | `save_logits=True`                                                    |
+| `save_overlays` | Whether overlays should be saved with the predicted masks                                   | `save_overlays=False`                                                 |
+| `device`        | Device where everything should happen: `cuda`, `cuda:<n>` for a specific GPU, or `cpu`.     | `device=cuda:1`                                                       |
+
 ## Extending the suite
 
 ### Adding a new model
@@ -252,6 +271,7 @@ Create `conf/crop/<crop>.yaml` with `name` and `train_crop`, following `tomato.y
 | `tools/`       | One-off checks                                                                                             |
 | `evaluate.py`  | Evaluation logic and loop, this is what you run to evaluate the models                                     |
 | `figures.py`   | Figure generation for scored and summarized runs                                                           |
+| `predict.py`   | Runs a specified model to generate predicted masks for given image(s)                                      |
 | `summarize.py` | Summarizes metrics for a given directory containing one or more metrics.json file(s) anywhere inside of it |
 | `train.py`     | Training logic and loop, this is what you run to train the models                                          |
 
