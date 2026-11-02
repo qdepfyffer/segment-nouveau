@@ -79,6 +79,21 @@ def _label_stem(image_path: Path) -> str:
     return stem
 
 
+def load_image(image_path: Path) -> torch.Tensor:
+    """
+    Loads an image as a float32 [3, H, W] tensor
+    :param image_path:  Path to the image to be loaded
+    :return:            float32 [3, H, W tensor]
+    """
+
+    # Load the visual image and convert it to the format that PyTorch expects
+    vis_img = Image.open(image_path).convert("RGB")
+    vis_img = F.to_image(vis_img)
+    vis_img = F.to_dtype(vis_img, torch.float32, scale=True)
+
+    # Return the loaded image
+    return vis_img
+
 def _load_mask(label_path: Path) -> np.ndarray:
     """
     Returns a numpy array representation of the binary mask pointed to by label_path as 0s and 1s
@@ -158,10 +173,8 @@ class SegmentationDataset(Dataset):
         vis_path = item[0]
         lbl_path = item[1]
 
-        # Load the visual image and convert it to the format that PyTorch expects
-        vis_img = Image.open(vis_path).convert("RGB")
-        vis_img = F.to_image(vis_img)
-        vis_img = F.to_dtype(vis_img, torch.float32, scale=True)
+        # Load the image
+        vis_img = load_image(vis_path)
 
         # Load the mask and convert it to the format that PyTorch expects
         mask = _load_mask(lbl_path)
