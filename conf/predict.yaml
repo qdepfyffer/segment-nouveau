@@ -1,0 +1,13 @@
+defaults:
+  - override hydra/job_logging: custom
+  - _self_
+
+checkpoint: ???
+input: ???
+save_logits: false
+save_overlays: false
+device: cuda
+
+hydra:
+  run:
+    dir: ${run_folder:${checkpoint}}/predict/${now:%Y-%m-%d_%H-%M-%S}
