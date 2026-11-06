@@ -118,6 +118,8 @@ Tensor sum: 12.0
 
 ## Training a model
 
+**Available models**: deeplabv3, frrn_a (full FRRN-A, ~17.7M parameters, needs a lot of GPU memory; see tools/model_info.py)"
+
 **Example single run**: `python train.py data_root=path/to/dataset crop=tomato epochs=100 patience=7 lr=1e-4 seed=0`
 
 Checkpoints are saved to `checkpoints/<crop>/<timestamp>/<model>-best.pt` by default, along with a `.hydra/` folder that contains `config.yaml` and `overrides.yaml` detailing how the training was configured, and the `history.json` and `train.log` that accompanied their training. A `git.json` file is written in the same location which details the state of the repo at the time the training was run. Models are automatically evaluated against each split in `eval_splits` (test split by default) corresponding to the crop they were trained on, and evaluation results are in `eval/<crop>-<split>/metrics.json`.

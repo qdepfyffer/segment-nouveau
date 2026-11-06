@@ -14,8 +14,9 @@ from typing import Any, cast
 from omegaconf import DictConfig, OmegaConf
 
 from models.deeplabv3 import DeepLabV3MobileNet
+from models.frrn_a import FRRNA
 
-MODELS = {"deeplabv3": DeepLabV3MobileNet}
+MODELS = {"deeplabv3": DeepLabV3MobileNet, "frrn_a": FRRNA}
 
 
 def build_model(model_cfg: DictConfig, num_classes: int):
