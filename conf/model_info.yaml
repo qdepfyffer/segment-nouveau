@@ -1,0 +1,12 @@
+defaults:
+  - model: deeplabv3
+  - override hydra/job_logging: custom
+  - _self_
+
+size: [768, 576]   # height, width of the test batch, matching the big crops' train_crop
+batch_size: 8
+device: cuda
+
+hydra:
+  run:
+    dir: outputs/model_info/${model.name}/${now:%Y-%m-%d_%H-%M-%S}

@@ -27,6 +27,9 @@ from models.padding import pad_to_multiple
 
 OmegaConf.register_new_resolver("run_folder", lambda path: str(run_folder(Path(path))))
 
+
+log = logging.getLogger(__name__)
+
 def pad_to_64(images):
     return pad_to_multiple(images, 64)  # Internal resizing of models commonly uses some power of 2, we use 64 because it's evenly divisible by 32, 16, 8, 4, and 2, so the model should handle it well
 
@@ -37,8 +40,6 @@ def pad_black(images):
 
 @hydra.main(config_path="../conf", config_name="check_sizing", version_base="1.3")
 def main(cfg: DictConfig):
-
-    log = logging.getLogger(__name__)
 
     # Load the model
     model, settings = load_checkpoint(Path(cfg.checkpoint), cfg.device)
