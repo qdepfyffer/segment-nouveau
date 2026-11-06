@@ -78,7 +78,7 @@ def main(cfg: DictConfig) -> None:
         json.dump(revision, file, indent=4)
 
     # Build specified model
-    model = build_model(cfg.model.name, num_classes=2)
+    model = build_model(cfg.model, num_classes=2)
     model = model.to(cfg.device)  # Move model to specified device
 
     # Load our datasets
