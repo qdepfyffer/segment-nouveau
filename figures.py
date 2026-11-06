@@ -8,6 +8,8 @@ from pathlib import Path
 
 import hydra
 import matplotlib
+from networkx import center
+import numpy as np
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
 
@@ -160,6 +162,76 @@ def plot_confusion(counts: dict, title: str, out_path: Path) -> None:
     fig.savefig(out_path, dpi=300)
     plt.close(fig)
 
+def plot_overview(results: dict, split: str, metric: str, out_path: Path) -> None:
+    """
+    Generates overview charts for the comparison of performance across crops
+    :param results:     The dictionary holding summary results to use for chart creation
+    :param split:       The split being compared
+    :param metric:      The metric by which runs should be compared in the chart
+    :param out_path:    Path the figure should be saved to
+    :return:            None
+    """
+
+    # Create a table to store results
+    table = {}  # table[setting][crop] = {"mean": ..., "std": ...}
+
+    # Loop over results
+    for section, rows in results.items():
+        crop, section_split = section.rsplit("-", 1)  # Gives crop, section_split
+
+        # Skip sections not matching `split`
+        if section_split != split:
+            continue
+
+        # Get the crop the model was trained on and the settings used
+        for name, row in rows.items():
+            train_crop, setting = name.split("/", 1)
+
+            # Skip cross-crop scores
+            if train_crop != crop:
+                continue
+
+            # Store the necessary data 
+            table.setdefault(setting, {})[crop] = row["stats"][metric]
+
+    # Aggregate crops being evaluated and settings
+    crops = sorted({crop for per_setting in table.values() for crop in per_setting})  # Abomination one liner, thanks Python
+    settings = sorted(table)
+
+    # If we only have one crop there's no point in running a comparison, so return early
+    if len(crops) < 2:
+        log.info(f"Could only locate metrics for one crop scored on {split}. Skipping overview.")
+        return
+
+    # Grouped bar figure info
+    x = np.arange(len(crops))  # One slot per crop
+    width = 0.8 / len(settings)  # Each group fills 80% of a slot so there's some gap
+    fig, ax = plt.subplots(figsize=(max(8, 1.6 * len(crops) + 2), 6))  # Figure should get wider with more crops
+
+    for i, setting in enumerate(settings):
+        offset = (i - (len(settings) - 1) / 2) * width
+
+        # Get per-crop stats
+        stats = [table[setting].get(crop) for crop in crops]
+        means = [stat["mean"] if stat else np.nan for stat in stats]
+        stds = [stat["std"] if stat else 0 for stat in stats]
+
+        # Build the bars
+        bars = ax.bar(x + offset, means, width, yerr=stds, capsize=4, label=setting)
+        ax.bar_label(bars, labels=[f"{mean:.3f}" if stat else "" for mean, stat in zip(means, stats)], label_type="center", color="white", fontsize=10)
+
+    # Set info for graph
+    ax.set_xticks(x, crops)
+    ax.set(ylabel=f"{metric} (mean ± std across seeds)", title=f"Scored on {split}: {metric} by crop")
+    ax.legend(title="setting")
+    ax.grid(axis="x", visible=False)
+
+    # Save and close fig
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+
 @hydra.main(config_path="conf", config_name="figures", version_base="1.3")
 def main(cfg: DictConfig) -> None:
     """
@@ -226,7 +298,7 @@ def main(cfg: DictConfig) -> None:
             # Plot confusion matrices
             plot_confusion(counts, conf_title, run_out / f"confusion-{metrics_path.parent.name}.png")
 
-    # Create comparison bar chart - first we need to find the summary
+    # Create comparison and overview charts - first we need to find the summary
     summary_path = folder / "summary" / "summary.json"
     if summary_path.is_file():
         with open(summary_path, "r") as file:
@@ -234,11 +306,16 @@ def main(cfg: DictConfig) -> None:
 
         # Log a warning and skip making comparison charts for an invalid metric
         if cfg.metric not in summary["metrics"]:
-            log.warning(f"{cfg.metric} not found in list of valid metrics: {summary['metrics']}; skipping comparison chart")
+            log.warning(f"{cfg.metric} not found in list of valid metrics: {summary['metrics']}; skipping comparison and overview charts")
         else:
             for section, rows in summary["results"].items():
                 title = f"{section}: {cfg.metric} comparison"
                 plot_comparison(rows, cfg.metric, title, out_dir / f"comparison-{section}.png")
+
+            # Get list of splits
+            splits = sorted({res.rsplit("-", 1)[1] for res in summary["results"]})
+            for split in splits:
+                plot_overview(summary["results"], split, cfg.metric, out_dir / f"overview-{split}.png")
 
     # Log a message letting the user know there was no summary found for the passed folder, we have nothing to generate charts from
     else:
