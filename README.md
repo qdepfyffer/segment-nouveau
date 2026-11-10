@@ -14,7 +14,7 @@ For reference: This repo was built based on [AIISLab segment-main](https://githu
  - Console logging only shows the time, .log files show the entire timestamp. Preferences for this functionality live in `conf/hydra/job_logging/custom.yaml`
  - Each crop has its own `train_crop` value in `conf/crop/<crop>.yaml` which will need to be set for any crops added down the line.
  - This project uses [hydra](https://hydra.cc/) now, rather than argparse. This changes the way command line arguments are input (`arg=val` instead of `--arg val`) and adds some new functionalities.
- - When passing filepaths for the data_root parameter, use full paths; $HOME/... works, a bare ~/... doesn't.
+ - When passing filepaths for the data_root parameter, use full paths; $HOME/... works, a bare ~/... doesn't (%USERPROFILE%\\... in Windows CMD rather than $HOME/...).
  - Scripts that work on one model take checkpoint (a run folder or the .pt inside it). Scripts that can work on many runs take folder (a single run, a crop folder, or a whole sweep).
 
 ## Dataset Requirements:  
@@ -118,17 +118,29 @@ Tensor sum: 12.0
 
 ## Training a model
 
-**Available models**: deeplabv3, frrn_a (full FRRN-A, ~17.7M parameters, needs a lot of GPU memory; see tools/model_info.py)"
+**Available models**: `deeplabv3` (DeepLabV3 with a MobileNet backbone, ~11.0M parameters), `frrn_a` (full FRRN-A, ~17.7M parameters, needs a lot of GPU memory), `frrn_a_lite` (reduced FRRN-A, ~1.4M parameters, width set by `model.base`). 
 
-**Example single run**: `python train.py data_root=path/to/dataset crop=tomato epochs=100 patience=7 lr=1e-4 seed=0`
+See [Checking a model's size and memory](#checking-a-models-size-and-memory) before picking a `batch_size`.
+
+**Example single run**:
+
+```bash
+python train.py data_root=path/to/dataset crop=tomato epochs=100 patience=7 lr=1e-4 seed=0
+```
 
 Checkpoints are saved to `checkpoints/<crop>/<timestamp>/<model>-best.pt` by default, along with a `.hydra/` folder that contains `config.yaml` and `overrides.yaml` detailing how the training was configured, and the `history.json` and `train.log` that accompanied their training. A `git.json` file is written in the same location which details the state of the repo at the time the training was run. Models are automatically evaluated against each split in `eval_splits` (test split by default) corresponding to the crop they were trained on, and evaluation results are in `eval/<crop>-<split>/metrics.json`.
 
-**Example multi-run**: `python train.py --multirun data_root=path/to/dataset crop=tomato epochs=100 patience=7 lr=1e-4,1e-3 seed=0,1,2`
+**Example multi-run**:
+
+```bash
+python train.py --multirun data_root=path/to/dataset crop=tomato epochs=100 patience=7 lr=1e-4,1e-3 seed=0,1,2
+```
 
 Sweeps (see above multi-run example) output to `checkpoints/sweeps/<timestamp>/<crop>/<settings>/`, where `<settings>` refers to the unique settings used to generate that specific checkpoint, e.g., `epochs-100+lr-0.0001+patience-7+seed-0`. Non-experimental keys like `device` or `num_workers` are left out of these settings, so changing them won't split a sweep's groupings.
 
 *Note: When passing a path, use `$HOME` instead of `~`, and if passing a list, arguments must be quoted (see `eval_splits` and `crop.train_crop` below and note the single quotes around the flags)*
+
+*Windows CMD: use `%USERPROFILE%` instead of `$HOME`, and double quotes instead of single quotes around list arguments, e.g. `"eval_splits=[valid,test]"`. PowerShell works with the commands as written.*
 
 ### Command line arguments (Training)
 
@@ -155,15 +167,64 @@ Sweeps (see above multi-run example) output to `checkpoints/sweeps/<timestamp>/<
 
 *`'eval_splits=[]'` disables automatic post-training evaluation
 
+### Choosing a GPU for training
+
+On a machine containing multiple GPUs (e.g. a shared lab PC), check which ones are free before beginning training:
+
+```bash
+nvidia-smi --query-gpu=index,pci.bus_id,name,memory.used,memory.total,utilization.gpu --format=csv
+```
+
+In torch, GPUs are numbered fastest-first. This might not necessarily match the order in `nvidia-smi`. 
+
+You can set `CUDA_DEVICE_ORDER=PCI_BUS_ID` in the terminal window you plan on training from so that the two numbering systems match:
+
+- bash: `export CUDA_DEVICE_ORDER=PCI_BUS_ID`
+- fish: `set -x CUDA_DEVICE_ORDER PCI_BUS_ID`
+- ps: `$env:CUDA_DEVICE_ORDER = "PCI_BUS_ID"`
+- cmd: `set CUDA_DEVICE_ORDER=PCI_BUS_ID`
+
+This setting lasts until that terminal is exited. The first lines of `train.log` note the GPU in use, its bus ID, and its free memory (and will warn you if that's less than half the total memory). If you're on Windows trust `nvidia-smi` rather than Task Manager for GPU usage information. A run on a GPU without enough free memory may sit at 0% instead of crashing.
+
+### Checking a model's size and memory
+
+`tools/model_info.py` builds a model, counts its parameters, checks that an odd-sized image comes back at the same size, and measures peak GPU memory for one training step:
+
+
+**Example check**:
+
+```bash
+python -m tools.model_info model=frrn_a_lite batch_size=4
+```
+
+| Argument     | Description                                                               | Example                           |
+| ------------ | ------------------------------------------------------------------------- | --------------------------------- |
+| `model`      | Which model to check, plus any of its options                             | `model=frrn_a_lite model.base=32` |
+| `size`       | Height, width of the test batch (defaults to the big crops' `train_crop`) | `'size=[256,480]'`                |
+| `batch_size` | Batch size for the memory check                                           | `batch_size=4`                    |
+| `device`     | GPU to measure on (`cpu` skips the memory check)                          | `device=cuda:1`                   |
+
+ If the batch doesn't fit, it logs an out-of-memory warning instead of crashing. Try a smaller batch_size. 
+ 
+ Peak memory only counts this process, so leave some headroom on a shared GPU. Logs go to `outputs/model_info/<model>/<timestamp>/`.
+
 ## Evaluating a model
 
 Models are scored using the sizing they were trained with, and always against the original labels at full size. `metrics.json` records sizing and code version used.
 
-**Example single evaluation**: `python evaluate.py folder=checkpoints/<crop>/<timestamp>/ crop=tomato split=test`
+**Example single evaluation**:
+
+```bash
+python evaluate.py folder=checkpoints/<crop>/<timestamp>/ crop=tomato split=test
+```
 
 Evaluation results are saved to `<run>/eval/<crop>-<split>/metrics.json`, where "crop" represents the evaluated dataset and "split" the evaluated split, alongside the accompanying `evaluate.log`.
 
-**Example multi-evaluation**: `python evaluate.py folder=checkpoints/sweeps/<timestamp>/ crop=tomato`
+**Example multi-evaluation**:
+
+```bash
+python evaluate.py folder=checkpoints/sweeps/<timestamp>/ crop=tomato
+```
 
 Evaluation of a whole sweep will score any `*-best.pt` files contained in the `folder` or any of `folder`'s subdirectories. An overall evaluate.log will be created in `<folder>/eval/<crop>-<split>/` which will list each run along with any failures. One failed run should not stop the others.
 
@@ -184,7 +245,11 @@ Evaluation of a whole sweep will score any `*-best.pt` files contained in the `f
 
 ## Summarizing results
 
-**Example summarization**: `python summarize.py folder=checkpoints/sweeps/<timestamp>/`
+**Example summarization**:
+
+```bash
+python summarize.py folder=checkpoints/sweeps/<timestamp>/
+```
 
 Takes a set of scored runs (as a result of automatic evaluation from `train.py` or manually via `evaluate.py`), reads the corresponding `metrics.json` for each run, groups runs that differ in seed only, and reports the mean ± standard deviation across stats for those runs. Prints one table per scored crop + split. Writes output to `<folder>/summary/summary.json` and `<folder>/summary/summarize.log`. The log holds the same table that's printed to the console.
 
@@ -195,9 +260,17 @@ Takes a set of scored runs (as a result of automatic evaluation from `train.py` 
 
 ## Generating figures
 
-**Example generation for a sweep**: `python figures.py folder=checkpoints/sweeps/<timestamp>/ metric=precision`
+**Example generation for a sweep**:
 
-**Example generation for a single run**: `python figures.py folder=checkpoints/<crop>/<timestamp>/ metric=precision`
+```bash
+python figures.py folder=checkpoints/sweeps/<timestamp>/ metric=precision
+```
+
+**Example generation for a single run**:
+
+```bash
+python figures.py folder=checkpoints/<crop>/<timestamp>/ metric=precision
+```
 
 To generate figures, the script reads `history.json` from the model's training to generate `curves.png` plotting metrics against epochs. It also reads `eval/*/metrics.json` from the model evaluation to generate confusion matrices, one per scored split, output as `confusion-<crop>-<split>.png`. Finally it reads `summary/summary.json` from the summarization script to output one `comparison-<crop>-<split>.png` per section. The script also writes `overview-<split>.png` per scored split made from the same summary which shows all crops side by side, one bar per setting, with mean ± std across seeds. The overview only considers models **scored on the crop they were trained on** and is skipped with a log message when the summary covers fewer than two crops (since that would just repeat that single crop's comparison chart). If `summary.json` is missing, it will log a message telling you to run `summarize.py` first. Runs without a `history.json` won't be found (so won't have confusion matrices generated), but missing files in general will not result in an error.
 
@@ -205,16 +278,24 @@ Everything output by `figures.py` goes in `<folder>/figures/`, where per-run fig
 
 *Note: The dashed line on the curve marks the saved (best according to `monitor` value used in training) epoch. It won't necessarily be at the peak of the `metric` being plotted, unless it matches the `monitor` value. Also, confusion matrices show percentages as a share of all pixels in the split with a fixed color scale so shades are comparable across figures. The titles for confusion matrices will always show `sunlit IoU` regardless of `metric`*
 
-| Argument | Description                                                                                                                                                                                     | Example                                         |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| `folder` | A sweep, crop folder inside a sweep, or any folder containing runs - Required                                                                                                                   | `folder=checkpoints/sweeps/2026-10-22_18-02-44` |
+| Argument | Description                                                                                                                                                                                                | Example                                         |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `folder` | A sweep, crop folder inside a sweep, or any folder containing runs - Required                                                                                                                              | `folder=checkpoints/sweeps/2026-10-22_18-02-44` |
 | `metric` | Which metric to use for the curves, comparison, and overview charts - Default is `sunlit_iou`, must be one of [`accuracy`, `precision`, `recall`, `fpr`, `f1`, `sunlit_iou`, `non_sunlit_iou`, `mean_iou`] | `metric=f1`                                     |
 
 ## Predicting on new images
 
-**Example prediction (folder)**: `python predict.py checkpoint=checkpoints/<crop>/<timestamp>/ input=<path/to/input/images> save_logits=True save_overlays=False` 
+**Example prediction (folder)**:
 
-**Example prediction (single image)**: `python predict.py checkpoint=checkpoints/<crop>/<timestamp>/ input=<path/to/input/image.png> save_logits=False save_overlays=True`
+```bash
+python predict.py checkpoint=checkpoints/<crop>/<timestamp>/ input=<path/to/input/images> save_logits=True save_overlays=False
+```
+
+**Example prediction (single image)**:
+
+```bash
+python predict.py checkpoint=checkpoints/<crop>/<timestamp>/ input=<path/to/input/image.png> save_logits=False save_overlays=True
+```
 
 Outputs are saved to `<run>/predict/<timestamp>` with a `predict.log` file and organized into folders corresponding to what they are: `masks/`, `logits/`, `overlays/`. Masks use the label colors and are named `<stem>_pred.png` to line up with `<stem>_L.png`. The other two outputs follow a similar scheme, with `_pred.png` being replaced by `_logits.npy` and `_overlay.png`. The overlays themselves tint only pixels predicted as `sunlit`. Saving the optional outputs (logits and overlays) can result in many large files being saved to your disk (~12 MB for logits per almond/citrus/grape image in the CIWA+ dataset), so saving them defaults to False.
 
@@ -234,7 +315,11 @@ Outputs are saved to `<run>/predict/<timestamp>` with a `predict.log` file and o
 
 *See `models/__init__.py`*
 
-New models require adding a config file under `conf/model/<name>.yaml`, containing `name: <name>` where `<name>` is its key in `MODELS`.
+New models require adding a config file under `conf/model/<name>.yaml`, containing `name: <name>` where `<name>` is its key in `MODELS`. Any other keys in that file get passed to the model's constructor and can be overridden in the command line (e.g. `model.base=32` for `frrn_a_lite`). Run the following command to check the new model's parameter count, output shape and memory use before training:
+
+```bash
+python -m tools.model_info model=<name>
+```
 
 *Note: You only need to do the following if the model was trained with `sizing=native`. `check_sizing.py` only applies to models trained with native sizing, it stops with a warning otherwise. This is by design.*
 
@@ -242,7 +327,7 @@ After adding and training a new model, run `python -m tools.check_sizing checkpo
 
 ### Adding a new crop
 
-Create `conf/crop/<crop>.yaml` with `name` and `train_crop`, following `tomato.yaml`. The folder name under your `data_root` must match the `name` of the corresponding `crop.yaml`. `train_crop` must fit inside the smallest image in the dataset, and ideally be divisible by the model's `size_multiple` (16 for DeepLabV3)
+Create `conf/crop/<crop>.yaml` with `name` and `train_crop`, following `tomato.yaml`. The folder name under your `data_root` must match the `name` of the corresponding `crop.yaml`. `train_crop` must fit inside the smallest image in the dataset, and ideally be divisible by the model's `size_multiple` (16 for DeepLabV3 and FRRN-A, 4 for FRRN-A lite).
 
 ### Adding a new loss function
 
