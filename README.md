@@ -118,7 +118,11 @@ Tensor sum: 12.0
 
 ## Training a model
 
-**Available models**: `deeplabv3` (DeepLabV3 with a MobileNet backbone, ~11.0M parameters), `frrn_a` (full FRRN-A, ~17.7M parameters, needs a lot of GPU memory), `frrn_a_lite` (reduced FRRN-A, ~1.4M parameters, width set by `model.base`), `fcdensenet` (FC-DenseNet103 matching the ~25.7M parameter version used in the 2026 CIWA tomato paper, also very memory hungry). 
+**Available models**: 
+- `deeplabv3` (DeepLabV3 with a MobileNet backbone, ~11.0M parameters)
+- `frrn_a` (full FRRN-A, ~17.7M parameters, needs a lot of GPU memory)
+- `frrn_a_lite` (reduced FRRN-A, ~1.4M parameters, width set by `model.base`)
+- `fcdensenet` (FC-DenseNet103 matching the ~25.7M parameter version used in the 2026 CIWA tomato paper, also very memory hungry)
 
 See [Checking a model's size and memory](#checking-a-models-size-and-memory) before picking a `batch_size`.
 
