@@ -15,8 +15,13 @@ from omegaconf import DictConfig, OmegaConf
 
 from models.deeplabv3 import DeepLabV3MobileNet
 from models.frrn_a import FRRNA
+from models.frrn_a_lite import FRRNALite
 
-MODELS = {"deeplabv3": DeepLabV3MobileNet, "frrn_a": FRRNA}
+MODELS = {
+    "deeplabv3": DeepLabV3MobileNet,
+    "frrn_a": FRRNA,
+    "frrn_a_lite": FRRNALite,
+}
 
 
 def build_model(model_cfg: DictConfig, num_classes: int):

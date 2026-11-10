@@ -4,8 +4,6 @@ Follows Pohlen et al. 2017, "Full-Resolution Residual Networks for Semantic Segm
 Full-size (~17.7M parameters) network from the 2022 CIWA pistachio paper
 """
 
-from typing import Any
-
 import torch
 from torch import nn
 from torch.nn import functional as F
