@@ -77,6 +77,29 @@ def main(cfg: DictConfig) -> None:
     with open(out_dir / "git.json", "w") as file:
         json.dump(revision, file, indent=4)
 
+    # Log which GPU is being used for the current run so that we can see if we're using the wrong GPU or a busy GPU in the first few lines of the log
+    device = torch.device(cfg.device)
+    if device.type == "cuda":
+
+        # Get the properties for the current device if its type is CUDA
+        index = device.index if device.index is not None else torch.cuda.current_device()
+        props = torch.cuda.get_device_properties(index)
+
+        # Get free memory and total memory
+        free, total = torch.cuda.mem_get_info(index)
+
+        # Get bus ID as shown by nvidia-smi and log a message listing the free and total memory
+        bus_id = f"{props.pci_domain_id:08X}:{props.pci_bus_id:02X}:{props.pci_device_id:02X}.0"
+        log.info(f"Using cuda:{index}: {props.name}, bus ID {bus_id}, {free / 2**30:.1f} of {total / 2**30:.1f} GiB free")
+
+        # Inform the user if less than half of the GPU's memory is available (means it's being used by something else when the script starts running)
+        if free < total / 2:
+            log.warning("Less than half of this GPU's memory is currently available. Another process may be using the same GPU. Check nvidia-smi for more information.")
+
+    # Otherwise if we're not using a CUDA device just log the device name, doesn't make sense to run the above checks otherwise
+    else:
+        log.info(f"Using device: {device}")
+
     # Build specified model
     model = build_model(cfg.model, num_classes=2)
     model = model.to(cfg.device)  # Move model to specified device
