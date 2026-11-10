@@ -14,6 +14,7 @@ from typing import Any, cast
 from omegaconf import DictConfig, OmegaConf
 
 from models.deeplabv3 import DeepLabV3MobileNet
+from models.fcdensenet import FCDenseNet103
 from models.frrn_a import FRRNA
 from models.frrn_a_lite import FRRNALite
 
@@ -21,6 +22,7 @@ MODELS = {
     "deeplabv3": DeepLabV3MobileNet,
     "frrn_a": FRRNA,
     "frrn_a_lite": FRRNALite,
+    "fcdensenet103": FCDenseNet103,
 }
 
 
