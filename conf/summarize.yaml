@@ -8,4 +8,3 @@ metrics: [accuracy, precision, recall, fpr, f1, sunlit_iou, non_sunlit_iou, mean
 hydra:
   run:
     dir: ${folder}/summary/
-    

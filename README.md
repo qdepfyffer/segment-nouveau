@@ -20,7 +20,7 @@ For reference: This repo was built based on [AIISLab segment-main](https://githu
 ## Dataset Requirements:  
 Your dataset should follow the example structure below. In short: One directory containing directories for each crop, each with their own test, train, and valid folders, with each split having a visual and label folder. Extra folders are ignored.
 
-Visual images are matched with their labels via their stems, where the labels have "_L" appended to their stem (i.e. the label for visual/img.jpg should be at label/img_L.png). Visual images can be `.jpg` or `.jpeg`, and any `-Visual` ending or leftover `.jpg`/`.JPG` are stripped before matching. For example, IMG1.JPG-Visual.jpeg pairs with IMG1_L.png.
+Visual images are matched with their labels via their stems, where the labels have "_L" appended to their stem (i.e. the label for visual/img.jpg should be at label/img_L.png). Visual images can be `.jpg`, `.jpeg`, `.png`, or `.tif`/`.tiff` and any `-Visual` ending or leftover extensions are stripped before matching. For example, IMG1.JPG-Visual.jpeg pairs with IMG1_L.png.
 
 Labels use exactly two colors, (0, 255, 0) for sunlit leaves and (165, 42, 42) for anything that isn't part of a sunlit leaf.
 
@@ -118,14 +118,14 @@ Tensor sum: 12.0
 
 ## Training a model
 
-**Available models**: `deeplabv3` (DeepLabV3 with a MobileNet backbone, ~11.0M parameters), `frrn_a` (full FRRN-A, ~17.7M parameters, needs a lot of GPU memory), `frrn_a_lite` (reduced FRRN-A, ~1.4M parameters, width set by `model.base`). 
+**Available models**: `deeplabv3` (DeepLabV3 with a MobileNet backbone, ~11.0M parameters), `frrn_a` (full FRRN-A, ~17.7M parameters, needs a lot of GPU memory), `frrn_a_lite` (reduced FRRN-A, ~1.4M parameters, width set by `model.base`), `fcdensenet` (FC-DenseNet103 matching the ~25.7M parameter version used in the 2026 CIWA tomato paper, also very memory hungry). 
 
 See [Checking a model's size and memory](#checking-a-models-size-and-memory) before picking a `batch_size`.
 
 **Example single run**:
 
 ```bash
-python train.py data_root=path/to/dataset crop=tomato epochs=100 patience=7 lr=1e-4 seed=0
+python train.py data_root=/full/path/to/dataset crop=tomato epochs=100 patience=7 lr=1e-4 seed=0
 ```
 
 Checkpoints are saved to `checkpoints/<crop>/<timestamp>/<model>-best.pt` by default, along with a `.hydra/` folder that contains `config.yaml` and `overrides.yaml` detailing how the training was configured, and the `history.json` and `train.log` that accompanied their training. A `git.json` file is written in the same location which details the state of the repo at the time the training was run. Models are automatically evaluated against each split in `eval_splits` (test split by default) corresponding to the crop they were trained on, and evaluation results are in `eval/<crop>-<split>/metrics.json`.
@@ -133,10 +133,10 @@ Checkpoints are saved to `checkpoints/<crop>/<timestamp>/<model>-best.pt` by def
 **Example multi-run**:
 
 ```bash
-python train.py --multirun data_root=path/to/dataset crop=tomato epochs=100 patience=7 lr=1e-4,1e-3 seed=0,1,2
+python train.py --multirun data_root=/full/path/to/dataset crop=tomato epochs=100 patience=7 lr=1e-4,1e-3 seed=0,1,2
 ```
 
-Sweeps (see above multi-run example) output to `checkpoints/sweeps/<timestamp>/<crop>/<settings>/`, where `<settings>` refers to the unique settings used to generate that specific checkpoint, e.g., `epochs-100+lr-0.0001+patience-7+seed-0`. Non-experimental keys like `device` or `num_workers` are left out of these settings, so changing them won't split a sweep's groupings.
+Sweeps (see above multi-run example) output to `checkpoints/sweeps/<timestamp>/<crop>/<settings>/`, where `<settings>` refers to the unique settings used to generate that specific checkpoint, e.g., `epochs-100+lr-1e-4+patience-7+seed-0`. Non-experimental keys like `device` or `num_workers` are left out of these settings, so changing them won't split a sweep's groupings. 
 
 *Note: When passing a path, use `$HOME` instead of `~`, and if passing a list, arguments must be quoted (see `eval_splits` and `crop.train_crop` below and note the single quotes around the flags)*
 
@@ -156,7 +156,7 @@ Sweeps (see above multi-run example) output to `checkpoints/sweeps/<timestamp>/<
 | `monitor`          | Which metric to monitor during training for early stopping and determining the best model to save                                                               | `monitor=valid_loss`               |
 | `patience`         | How many epochs to continue training for without seeing improvement in the monitored value                                                                      | `patience=7`                       |
 | `batch_size`       | Number of images in each training batch                                                                                                                         | `batch_size=8`                     |
-| `lr`               | The learning rate of the model                                                                                                                                  | `lr=1e-4`                          |
+| `lr`               | The learning rate of the model                                                                                                                                  | `lr=1e-4`**                        |
 | `crop.train_crop`  | The size of the random crop that is applied to training images (h x w)                                                                                          | `'crop.train_crop=[256,480]'`      |
 | `output_dir`       | The folder this script should output to                                                                                                                         | `output_dir=checkpoints`           |
 | `seed`             | Number to use as a random seed for anything that can be seeded                                                                                                  | `seed=42`                          |
@@ -166,6 +166,8 @@ Sweeps (see above multi-run example) output to `checkpoints/sweeps/<timestamp>/<
 | `num_workers`      | Number of processes loading data in parallel - note that this does in fact result in different random crops, so keep it the same when trying to reproduce a run | `num_workers=8`                    |
 
 *`'eval_splits=[]'` disables automatic post-training evaluation
+
+**`lr=1e-4` and `lr=0.0001` will create different folders despite being equivalent values.
 
 ### Choosing a GPU for training
 
@@ -327,7 +329,7 @@ After adding and training a new model, run `python -m tools.check_sizing checkpo
 
 ### Adding a new crop
 
-Create `conf/crop/<crop>.yaml` with `name` and `train_crop`, following `tomato.yaml`. The folder name under your `data_root` must match the `name` of the corresponding `crop.yaml`. `train_crop` must fit inside the smallest image in the dataset, and ideally be divisible by the model's `size_multiple` (16 for DeepLabV3 and FRRN-A, 4 for FRRN-A lite).
+Create `conf/crop/<crop>.yaml` with `name` and `train_crop`, following `tomato.yaml`. The folder name under your `data_root` must match the `name` of the corresponding `crop.yaml`. `train_crop` must fit inside the smallest image in the dataset, and ideally be divisible by the model's `size_multiple` (32 for FCDenseNet, 16 for DeepLabV3 and FRRN-A, 4 for FRRN-A lite).
 
 ### Adding a new loss function
 

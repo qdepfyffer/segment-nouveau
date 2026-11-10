@@ -4,7 +4,6 @@ Run this after writing a new model and before training it.
 """
 
 import logging
-from pathlib import Path
 
 import hydra
 import torch
@@ -25,7 +24,7 @@ def main(cfg: DictConfig):
     # Build model
     model = build_model(cfg.model, num_classes=2).to(cfg.device)
 
-    # Calculate total paramaters
+    # Calculate total parameters
     total = sum(p.numel() for p in model.parameters())
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
 

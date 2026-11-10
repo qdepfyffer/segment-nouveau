@@ -11,3 +11,4 @@ device: cuda
 hydra:
   run:
     dir: ${run_folder:${checkpoint}}/predict/${now:%Y-%m-%d_%H-%M-%S}
+

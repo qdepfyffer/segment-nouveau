@@ -42,9 +42,9 @@ def _find_pairs(data_root: Path, crop: str, split: str) -> list[tuple[Path, Path
     vis_imgs = sorted(p for p in vis_dir.iterdir() if p.suffix.lower() in IMAGE_SUFFIXES)
 
     # Now we need to find the labels to match the visual images
-    # Label filenames are <stem>_L.png, where <stem> comes from _label_stem()
+    # Label filenames are <stem>_L.png, where <stem> comes from label_stem()
     for file in vis_imgs:
-        stem = _label_stem(file)
+        stem = label_stem(file)
         lbl_path = data_root / crop / split / "label" / f"{stem}_L.png"
         # Raise an exception if we can't find a label for an image
         if not lbl_path.exists():
@@ -58,7 +58,7 @@ def _find_pairs(data_root: Path, crop: str, split: str) -> list[tuple[Path, Path
     return pairs
 
 
-def _label_stem(image_path: Path) -> str:
+def label_stem(image_path: Path) -> str:
     """
     Takes an image file name and returns the stem its label uses
     :param image_path:  The path to the image we want the stem for
@@ -82,7 +82,7 @@ def load_image(image_path: Path) -> torch.Tensor:
     """
     Loads an image as a float32 [3, H, W] tensor
     :param image_path:  Path to the image to be loaded
-    :return:            float32 [3, H, W tensor]
+    :return:            float32 [3, H, W] tensor
     """
 
     # Load the visual image and convert it to the format that PyTorch expects

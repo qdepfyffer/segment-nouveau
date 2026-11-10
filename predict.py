@@ -1,3 +1,7 @@
+"""
+Script to generate predictions for a given set of input images with a specific model
+"""
+
 import logging
 from pathlib import Path
 
@@ -9,7 +13,7 @@ from omegaconf import DictConfig, OmegaConf
 from PIL import Image
 from tqdm import tqdm
 
-from components.dataset import IMAGE_SUFFIXES, _label_stem, classes, load_image
+from components.dataset import IMAGE_SUFFIXES, classes, label_stem, load_image
 from components.inference import predict_logits
 from components.progress import bar_desc
 from components.scoring import load_checkpoint, run_folder
@@ -78,7 +82,7 @@ def main(cfg: DictConfig) -> None:
             mask = logits.argmax(dim=1)[0].cpu().numpy()
 
             # Get the label stem for the image path (so predicted masks have names matching the gt labels)
-            stem = _label_stem(image_path)
+            stem = label_stem(image_path)
 
             # Optionally save logits
             if cfg.save_logits:

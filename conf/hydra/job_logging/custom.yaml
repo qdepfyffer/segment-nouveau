@@ -1,4 +1,4 @@
-# This completely replaces Hydra's defauly logging config so it has to be thorough
+# This completely replaces Hydra's default logging config so it has to be thorough
 version: 1
 formatters:
   console:

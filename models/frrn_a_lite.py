@@ -1,6 +1,6 @@
 """
 FRRN-A lite - reduced FRRN-A-style network from the 2026 CIWA tomato paper
-Keeps FRRN's two streams, pooling twice instead of four times, using one convolution per FRRU, and a 48 channel residual stream
+Keeps FRRN's two streams, pooling twice instead of four times, using one convolution per FRRU, and a <base> (48 by default as defined in frrn_a_lite.yaml) channel residual stream
 For the full network see frrn_a.py
 """
 
@@ -79,4 +79,3 @@ class FRRNALite(nn.Module):
         y, z = self.frru_up0(self.up0(y), z)
         logits = self.head(self.tail(z))
         return logits[..., :height, :width]
-    

@@ -108,10 +108,10 @@ def score_run(model, settings, data_root, crop, split, out_dir, num_workers):
     :param model:       The model to be evaluated
     :param settings:    The model's training config as returned by load_checkpoint()
     :param data_root:   The root directory holding the datasets
-    :param num_workers: Number of workers for parallel data loading
     :param crop:        Which crop is being used in evaluation  
     :param split:       Which split the model is being evaluated against 
     :param out_dir:     The output directory for model metrics
+    :param num_workers: Number of workers for parallel data loading
     :return:            The metrics dict that was written to metrics.json
     """
     # Make sure out_dir exists and set output path for evaluation

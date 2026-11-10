@@ -17,7 +17,7 @@ DECODER_STAGES = [(192, 2, 8), (192, 2, 4), (96, 2, 2)]
 
 def conv_bn_relu(in_channels: int, out_channels: int, kernel_size: int = 3) -> nn.Sequential:
     """
-    Convolution, batch norm, ReLu - in a row, maintaining height and width
+    Convolution, batch norm, ReLU - in a row, maintaining height and width
     :param in_channels:     Number of channels coming in
     :param out_channels:    Number of channels going out
     :param kernel_size:     Size of the (square) convolution kernel, defaults to 3
@@ -92,7 +92,6 @@ class FRRUStage(nn.Module):
 class FRRNA(nn.Module):
     """
     Full FRRN-A - full-resolution residual stream (z) alongside a pooling stream (y) that is shrunk to 1/16 and back
-    :param nn: _description_
     """
 
     size_multiple = 16  # Pooling stream is halved four times so height and width must divide by 16
