@@ -36,7 +36,7 @@ def main(cfg: DictConfig) -> None:
     """
 
     # Make sure a valid monitor argument has been passed
-    MONITORS = ["valid_loss", "sunlit_iou", "f1", "mean_iou", "precision"]
+    MONITORS = ["valid_loss", "sunlit_iou", "f1", "mean_iou"]
     if cfg.monitor not in MONITORS:
         raise ValueError(f"{cfg.monitor} not found in list of valid monitors: " + " ".join(MONITORS))
 
