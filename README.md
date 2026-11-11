@@ -17,6 +17,28 @@ For reference: This repo was built based on [AIISLab segment-main](https://githu
  - When passing filepaths for the data_root parameter, use full paths; $HOME/... works, a bare ~/... doesn't (%USERPROFILE%\\... in Windows CMD rather than $HOME/...).
  - Scripts that work on one model take checkpoint (a run folder or the .pt inside it). Scripts that can work on many runs take folder (a single run, a crop folder, or a whole sweep).
 
+## README contents:
+
+[Dataset Requirements](#dataset-requirements)
+
+[Getting Started](#getting-started)
+
+[Training a Model](#training-a-model)
+
+[Evaluating a Model](#evaluating-a-model)
+
+[Summarizing Results](#summarizing-results)
+
+[Generating Figures](#generating-figures)
+
+[Predicting on New Images](#predicting-on-new-images)
+
+[Extending the Suite](#extending-the-suite)
+
+[Repo Contents](#repo-contents)
+
+[Design Decisions](#design-decisions-or-alternatively-why-would-you-rebuild-a-perfectly-good-tool)
+
 ## Dataset Requirements:  
 Your dataset should follow the example structure below. In short: One directory containing directories for each crop, each with their own test, train, and valid folders, with each split having a visual and label folder. Extra folders are ignored.
 
