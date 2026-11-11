@@ -81,6 +81,23 @@ def short_count(n: int) -> str:
             return f"{n / size:.3g}{suffix}"  # If we're over a cutoff return the formatted count
     return str(n)  # If it's not above any of the cutoffs just return the string representation of the count
 
+def split_shared(settings: list[str]) -> tuple[list[str], str]:
+    """
+    Splits setting names into parts; what's different between them and what do they all share
+    :param settings:    Setting names as found in summary.json (kv pairs joined with +)
+    :return:            The differing part of each name, and the shared parts as a single string
+    """
+
+    # Split the settings by individual settings
+    parts = [setting.split("+") for setting in settings]
+
+    # Determine what settings are shared among all
+    shared = [part for part in parts[0] if all(part in other for other in parts[1:])]
+
+    # Build shared + unique string
+    short = ["+".join(part for part in setting_parts if part not in shared) or "all runs" for setting_parts in parts]
+    return short, ", ".join(shared)
+
 def plot_comparison(rows: dict, metric: str, title: str, out_path: Path) -> None:
     """
     Plots comparison figures for multirun summaries for direct comparison between models with different settings 
@@ -91,8 +108,14 @@ def plot_comparison(rows: dict, metric: str, title: str, out_path: Path) -> None
     :return:            None
     """
 
+    # Determine names for bars in comparison and shared elements
+    train_crops, settings = zip(*(name.split("/", 1) for name in rows))
+    short, shared = split_shared(list(settings))
+    if len(set(train_crops)) > 1:  # Only name training crop when the rows don't all share one
+        short = [f"{crop}/{setting}" for crop, setting in zip(train_crops, short)]
+    names = [f"{setting}\n(n={row['runs']})" for setting, row in zip(short, rows.values())]
+
     # Collect information from summary.json
-    names = [f"{name}\n(n={row['runs']})" for name, row in rows.items()]
     means = [row["stats"][metric]["mean"] for row in rows.values()]
     stds  = [row["stats"][metric]["std"]  for row in rows.values()]
 
@@ -103,6 +126,8 @@ def plot_comparison(rows: dict, metric: str, title: str, out_path: Path) -> None
     bars = ax.barh(names, means, xerr=stds, capsize=4)
     ax.bar_label(bars, labels=[f"{m:.3f} ± {s:.3f}" for m, s in zip(means, stds)], label_type="center", color="white")
     ax.invert_yaxis()
+    if shared:
+        title += f"\nshared: {shared}"
     ax.set(xlabel=f"{metric} (mean ± std across seeds)", title=title)
 
     # Save and close fig
@@ -196,6 +221,7 @@ def plot_overview(results: dict, split: str, metric: str, out_path: Path) -> Non
     # Aggregate crops being evaluated and settings
     crops = sorted({crop for per_setting in table.values() for crop in per_setting})  # Abomination one liner, thanks Python
     settings = sorted(table)
+    short, shared = split_shared(settings)
 
     # If we only have one crop there's no point in running a comparison, so return early
     if len(crops) < 2:
@@ -216,13 +242,16 @@ def plot_overview(results: dict, split: str, metric: str, out_path: Path) -> Non
         stds = [stat["std"] if stat else 0 for stat in stats]
 
         # Build the bars
-        bars = ax.bar(x + offset, means, width, yerr=stds, capsize=4, label=setting)
+        bars = ax.bar(x + offset, means, width, yerr=stds, capsize=4, label=short[i])
         ax.bar_label(bars, labels=[f"{mean:.3f}" if stat else "" for mean, stat in zip(means, stats)], label_type="center", color="white", fontsize=10)
 
     # Set info for graph
     ax.set_xticks(x, crops)
-    ax.set(ylabel=f"{metric} (mean ± std across seeds)", title=f"Scored on {split}: {metric} by crop")
-    ax.legend(title="setting")
+    title = f"Scored on {split}: {metric} by crop"
+    if shared:
+        title += f"\nshared: {shared}"
+    ax.set(ylabel=f"{metric} (mean ± std across seeds)", title=title)
+    ax.legend(title="setting", loc="upper left", bbox_to_anchor=(1.01, 1))  # Outside the plot so it can't cover bars
     ax.grid(axis="x", visible=False)
 
     # Save and close fig
