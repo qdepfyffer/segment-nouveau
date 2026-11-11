@@ -4,6 +4,7 @@ Generates figures for the evaluation of models as created/evaluated by train.py/
 
 import json
 import logging
+import textwrap
 from pathlib import Path
 
 import hydra
@@ -98,6 +99,30 @@ def split_shared(settings: list[str]) -> tuple[list[str], str]:
     short = ["+".join(part for part in setting_parts if part not in shared) or "all runs" for setting_parts in parts]
     return short, ", ".join(shared)
 
+def stack_labels(labels: list[str], max_chars: int = 30) -> list[str]:
+    """
+    Puts each setting on a new line if any label is too long, so all labels match
+    :param labels:       Labels made up of settings joined with "+"
+    :param max_chars:   If any label is longer than this they all get stacked, defaults to 30
+    :return:            The labels (either stacked or unchanged)
+    """
+
+    if any(len(label) > max_chars for label in labels):
+        return [label.replace("+", "\n") for label in labels]
+    return labels
+
+def with_shared(title: str, shared: str) -> str:
+    """
+    Adds the settings shared by all bars to a title that gets wrapped so long lists don't widen figures
+    :param title:   The figure title
+    :param shared:  The shared settings (from split_shared())
+    :return:        The title with the shared settings on the following line or lines
+    """
+
+    if not shared:
+        return title
+    return title + "\n" + textwrap.fill(f"shared: {shared}", width=80, break_on_hyphens=False)
+
 def plot_comparison(rows: dict, metric: str, title: str, out_path: Path) -> None:
     """
     Plots comparison figures for multirun summaries for direct comparison between models with different settings 
@@ -112,26 +137,25 @@ def plot_comparison(rows: dict, metric: str, title: str, out_path: Path) -> None
     train_crops, settings = zip(*(name.split("/", 1) for name in rows))
     short, shared = split_shared(list(settings))
     if len(set(train_crops)) > 1:  # Only name training crop when the rows don't all share one
-        short = [f"{crop}/{setting}" for crop, setting in zip(train_crops, short)]
-    names = [f"{setting}\n(n={row['runs']})" for setting, row in zip(short, rows.values())]
+        short = [crop if setting == "all runs" else f"{crop}/{setting}" for crop, setting in zip(train_crops, short)]
+    names = [f"{label}\n(n={row['runs']})" for label, row in zip(stack_labels(short), rows.values())]
 
     # Collect information from summary.json
     means = [row["stats"][metric]["mean"] for row in rows.values()]
     stds  = [row["stats"][metric]["std"]  for row in rows.values()]
 
-    # Create the figure - more runs needs a bigger figure, adjust the below constant values if things don't look quite right
-    fig, ax = plt.subplots(figsize=(10, 0.9 * len(names) + 1.5))
+    # Fixed bar area, each row gets room for its tallest label, and labels/title sit outside the axes
+    lines = max(name.count("\n") + 1 for name in names)
+    fig = plt.figure(figsize=(6, (0.25 * lines + 0.35) * len(names)))
+    ax = fig.add_axes((0, 0, 1, 1))  # Axes fill the figure, savefig's bbox_inches="tight" grows the image to fit the labels
 
     # Use horizontal bar chart since we have long names that won't fit on a vertical bar chart very well
     bars = ax.barh(names, means, xerr=stds, capsize=4)
     ax.bar_label(bars, labels=[f"{m:.3f} ± {s:.3f}" for m, s in zip(means, stds)], label_type="center", color="white")
     ax.invert_yaxis()
-    if shared:
-        title += f"\nshared: {shared}"
-    ax.set(xlabel=f"{metric} (mean ± std across seeds)", title=title)
+    ax.set(xlabel=f"{metric} (mean ± std across seeds)", title=with_shared(title, shared))
 
     # Save and close fig
-    fig.tight_layout()
     fig.savefig(out_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
 
@@ -222,6 +246,7 @@ def plot_overview(results: dict, split: str, metric: str, out_path: Path) -> Non
     crops = sorted({crop for per_setting in table.values() for crop in per_setting})  # Abomination one liner, thanks Python
     settings = sorted(table)
     short, shared = split_shared(settings)
+    labels = stack_labels(short)
 
     # If we only have one crop there's no point in running a comparison, so return early
     if len(crops) < 2:
@@ -231,7 +256,9 @@ def plot_overview(results: dict, split: str, metric: str, out_path: Path) -> Non
     # Grouped bar figure info
     x = np.arange(len(crops))  # One slot per crop
     width = 0.8 / len(settings)  # Each group fills 80% of a slot so there's some gap
-    fig, ax = plt.subplots(figsize=(max(8, 1.6 * len(crops) + 2), 6))  # Figure should get wider with more crops
+    fig = plt.figure(figsize=(max(6, 1.4 * len(crops), 0.25 * len(crops) * len(settings)), 5))  # Bar area gets wider with more crops and bars
+    rotation = 90 if len(settings) > 2 else 0  # Value labels go vertical once bars get too thin for them
+    ax = fig.add_axes((0, 0, 1, 1))  # Axes fill the figure, savefig's bbox_inches="tight" grows the image to fit the legend
 
     for i, setting in enumerate(settings):
         offset = (i - (len(settings) - 1) / 2) * width
@@ -242,20 +269,16 @@ def plot_overview(results: dict, split: str, metric: str, out_path: Path) -> Non
         stds = [stat["std"] if stat else 0 for stat in stats]
 
         # Build the bars
-        bars = ax.bar(x + offset, means, width, yerr=stds, capsize=4, label=short[i])
-        ax.bar_label(bars, labels=[f"{mean:.3f}" if stat else "" for mean, stat in zip(means, stats)], label_type="center", color="white", fontsize=10)
+        bars = ax.bar(x + offset, means, width, yerr=stds, capsize=4, label=labels[i])
+        ax.bar_label(bars, labels=[f"{mean:.3f}" if stat else "" for mean, stat in zip(means, stats)], label_type="center", color="white", fontsize=10, rotation=rotation)
 
     # Set info for graph
     ax.set_xticks(x, crops)
-    title = f"Scored on {split}: {metric} by crop"
-    if shared:
-        title += f"\nshared: {shared}"
-    ax.set(ylabel=f"{metric} (mean ± std across seeds)", title=title)
+    ax.set(ylabel=f"{metric} (mean ± std across seeds)", title=with_shared(f"Scored on {split}: {metric} by crop", shared))
     ax.legend(title="setting", loc="upper left", bbox_to_anchor=(1.01, 1))  # Outside the plot so it can't cover bars
     ax.grid(axis="x", visible=False)
 
     # Save and close fig
-    fig.tight_layout()
     fig.savefig(out_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
 
