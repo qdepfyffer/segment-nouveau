@@ -15,6 +15,9 @@ from omegaconf import DictConfig
 # Set up logging
 log = logging.getLogger(__name__)
 
+# Config keys that are left out of sweep folder names + the seed - differences in these don't necessarily mean a different experiment
+NON_SETTING_KEYS = {"seed", "data_root", "output_dir", "device", "num_workers", "eval_splits"}
+
 @hydra.main(config_path="conf", config_name="summarize", version_base="1.3")
 def main(cfg: DictConfig):
 
@@ -45,6 +48,14 @@ def main(cfg: DictConfig):
         scores = data["metrics"]["scores"]  # The model's scores {"accuracy": 0.000..., "precision": ..., ...}
         run_folder = path.parents[2]  # The run folder (metrics.json sits in <run>/eval/<crop>-<split>/)
 
+        # What the run was trained with minus excluded keys
+        settings = {option: value for option, value in data["model"].items() if option not in NON_SETTING_KEYS}
+
+        # Which code the run was trained with (older runs might not have a git.json since train.py didn't create it at first)
+        git_path = run_folder / "git.json"
+        revision = json.loads(git_path.read_text()) if git_path.is_file() else {"commit": None, "dirty": None}
+        commit = (revision["commit"] or "unknown")[:7] + ("-dirty" if revision["dirty"] else "")
+
         # Strip the "seed-n" portion of the run folder (since we're averaging across seeds for comparison purposes)
         pieces = [piece for piece in run_folder.name.split("+") if not piece.startswith("seed-")]
         stripped = "+".join(pieces)
@@ -52,11 +63,23 @@ def main(cfg: DictConfig):
 
         # Group the runs
         key = (eval_crop, eval_split, train_crop, setting)
-        group = groups.setdefault(key, {"scores":[], "runs": []})
+        group = groups.setdefault(key, {"scores":[], "runs": [], "settings": [], "commits": set()})
         group["scores"].append(scores)
         group["runs"].append(run_folder)
+        group["settings"].append(settings)
+        group["commits"].add(commit)  # Commits go in a set so more than one commit means we're mixing code versions
 
     for key, group in groups.items():
+
+        # Warn when runs grouped by folder name weren't trained the same way
+        group_name = f"{key[2]}/{key[3]} (scored on {key[0]} {key[1]})"
+        first = group["settings"][0]
+        all_options = set().union(*group["settings"])
+        different = sorted(option for option in all_options if any(other.get(option) != first.get(option) for other in group["settings"]))
+        if different:
+            log.warning(f"{group_name}: runs were trained with different settings ({', '.join(different)}) - they may not belong in one group")
+        if len(group["commits"]) > 1:
+            log.warning(f"{group_name}: runs were trained on different commits ({', '.join(sorted(group['commits']))})")
 
         # Calculate mean and stdev for each score (this will be for each setting across seeds)
         group["stats"] = {}
