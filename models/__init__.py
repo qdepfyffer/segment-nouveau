@@ -26,11 +26,12 @@ MODELS = {
 }
 
 
-def build_model(model_cfg: DictConfig, num_classes: int):
+def build_model(model_cfg: DictConfig, num_classes: int, pretrained: bool = True):
     """
     Returns the model corresponding to the specified name
     :param model_cfg:   Model section of config, name plus any options
     :param num_classes: The number of classes the model should be initialized with
+    :param pretrained:  Whether models with a pretrained backbone should download it (False when a checkpoint will overwrite the weights)
     :return:            The built model
     """
 
@@ -43,4 +44,10 @@ def build_model(model_cfg: DictConfig, num_classes: int):
             f"Model {name} not found in models list. Available models: {sorted(MODELS)}"
         )
 
-    return MODELS[name](num_classes=num_classes, **options)
+    model_class = MODELS[name]  # Class of model to be returned later
+
+    # Check if the model class is one with a pretrained backbone and set that flag according to build_model's arguments
+    if getattr(model_class, "has_pretrained_backbone", False):
+        options["pretrained"] = pretrained
+
+    return model_class(num_classes=num_classes, **options)

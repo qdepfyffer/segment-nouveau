@@ -53,7 +53,7 @@ def load_checkpoint(checkpoint: Path, device):
         raise FileNotFoundError(f"Model checkpoint could not be found at {checkpoint_path}. Please double check and try again.")
 
     # Build the model based on saved settings, move it to specified device
-    model = build_model(settings.model, num_classes=2)  # CIWA+ only uses 2 classes
+    model = build_model(settings.model, num_classes=2, pretrained=False)  # CIWA+ only uses 2 classes and pretrained is false since we're overwriting the weights and want to avoid downloading pretrained backbones during evaluation
     model.load_state_dict(torch.load(checkpoint_path, map_location=device, weights_only=True))  # We only load the weights for safety
     model.to(device)
     model.eval()
