@@ -240,13 +240,13 @@ def main(cfg: DictConfig) -> None:
     # Otherwise we try to load the best model and evaluate it over it's OWN dataset (evaluate.py can still evaluate a model on different datasets)
     try:
         if not best_model_path.exists():
-            log.warning(f"Checkpoint not found: {best_model_path}")  # Exit early if the checkpoint doesn't exist for any reason
-            return
+            raise FileNotFoundError(f"Checkpoint not found: {best_model_path}")  # Exit early if the checkpoint doesn't exist for any reason - Caught below, logged, then re-raised
         model, settings = load_checkpoint(out_dir, cfg.device)
         for split in eval_splits:
             score_run(model, settings, None, cfg.crop.name, split, out_dir / "eval" / f"{cfg.crop.name}-{split}", num_workers=cfg.num_workers)
     except Exception:
         log.exception("Automatic scoring failed - training results intact, score them with evaluate.py")
+        raise  # Mark this run as failed, sweep should still finish its other runs and report failures at the end (re-throws the error that was just caught)
 
 if __name__ == "__main__":
     main()
