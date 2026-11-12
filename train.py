@@ -119,6 +119,9 @@ def main(cfg: DictConfig) -> None:
     # Loss will need to be negated during the training for this calculation
     best_value = float("-inf")
 
+    # Keep track of best epoch number
+    best_epoch = None
+
     # Initialize history as an empty list so we can track the model's scores and plot training curves later
     history = []
 
@@ -211,6 +214,9 @@ def main(cfg: DictConfig) -> None:
             # If we have a better score, update our current best, save the current weights, inform the user, and reset our patience counter
             best_value = current_value
 
+            # Update best epoch
+            best_epoch = epoch + 1
+
             # Prevent anything from reading a half-written set of weights (since torch takes a second to write the file)
             temp_path = best_model_path.with_suffix(".tmp")  # Temporary file next to the real one - with_suffix() creates a path only; no file exists
             torch.save(model.state_dict(), temp_path)  # Write the weights to the temporary file - the actual weights file that is read by scripts in this repo isn't touched yet
@@ -230,6 +236,12 @@ def main(cfg: DictConfig) -> None:
 
         # Put the model back in training mode before the next iteration
         model.train()
+
+    # Say which epoch's weights were kept, since the last "Best model saved" line can be far up the log
+    if best_epoch is None:
+        log.warning(f"{cfg.monitor} never produced a usable value - no weights saved")
+    else:
+        log.info(f"Trained for {len(history)} epoch(s) - best epoch {best_epoch} ({cfg.monitor}: {history[best_epoch - 1][cfg.monitor]:.4f})")
 
     del model, optimizer  # Drop the training copy & everything the optimizer holds so it doesn't sit in memory alongside the loaded best checkpoint for evaluation
     torch.cuda.empty_cache()  # Hand back freed memory
