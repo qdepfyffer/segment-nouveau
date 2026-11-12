@@ -154,7 +154,7 @@ See [Checking a model's size and memory](#checking-a-models-size-and-memory) bef
 python train.py data_root=/full/path/to/dataset crop=tomato epochs=100 patience=7 lr=1e-4 seed=0
 ```
 
-Checkpoints are saved to `checkpoints/<crop>/<timestamp>/<model>-best.pt` by default, along with a `.hydra/` folder that contains `config.yaml` and `overrides.yaml` detailing how the training was configured, and the `history.json` and `train.log` that accompanied their training. A `git.json` file is written in the same location which details the state of the repo at the time the training was run. Models are automatically evaluated against each split in `eval_splits` (test split by default) corresponding to the crop they were trained on, and evaluation results are in `eval/<crop>-<split>/metrics.json`.
+Checkpoints are saved to `checkpoints/<model>/<crop>/<timestamp>/<model>-best.pt` by default, along with a `.hydra/` folder that contains `config.yaml` and `overrides.yaml` detailing how the training was configured, and the `history.json` and `train.log` that accompanied their training. A `git.json` file is written in the same location which details the state of the repo at the time the training was run. Models are automatically evaluated against each split in `eval_splits` (test split by default) corresponding to the crop they were trained on, and evaluation results are in `eval/<crop>-<split>/metrics.json`.
 
 **Example multi-run**:
 
@@ -162,7 +162,7 @@ Checkpoints are saved to `checkpoints/<crop>/<timestamp>/<model>-best.pt` by def
 python train.py --multirun data_root=/full/path/to/dataset crop=tomato epochs=100 patience=7 lr=1e-4,1e-3 seed=0,1,2
 ```
 
-Sweeps (see above multi-run example) output to `checkpoints/sweeps/<timestamp>/<crop>/<settings>/`, where `<settings>` refers to the unique settings used to generate that specific checkpoint, e.g., `epochs-100+lr-1e-4+patience-7+seed-0`. Non-experimental keys like `device` or `num_workers` are left out of these settings, so changing them won't split a sweep's groupings. 
+Sweeps (see above multi-run example) output to `checkpoints/sweeps/<timestamp>/<model>/<crop>/<settings>/`, where `<settings>` refers to the unique settings used to generate that specific checkpoint, e.g., `epochs-100+lr-1e-4+patience-7+seed-0` and `<model>` refers to the specific model that was trained. Non-experimental keys like `device` or `num_workers` are left out of these settings, so changing them won't split a sweep's groupings. 
 
 *Note: When passing a path, use `$HOME` instead of `~`, and if passing a list, arguments must be quoted (see `eval_splits` and `crop.train_crop` below and note the single quotes around the flags)*
 
@@ -243,7 +243,7 @@ Models are scored using the sizing they were trained with, and always against th
 **Example single evaluation**:
 
 ```bash
-python evaluate.py folder=checkpoints/<crop>/<timestamp>/ crop=tomato split=test
+python evaluate.py folder=checkpoints/<model>/<crop>/<timestamp>/ crop=tomato split=test
 ```
 
 Evaluation results are saved to `<run>/eval/<crop>-<split>/metrics.json`, where "crop" represents the evaluated dataset and "split" the evaluated split, alongside the accompanying `evaluate.log`.
@@ -260,14 +260,14 @@ Evaluation of a whole sweep will score any `*-best.pt` files contained in the `f
 
 ### Command line arguments (Evaluation)
 
-| Argument      | Description                                                                                                                                                             | Example                                          |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| `folder`      | A run folder, any folder containing runs, or the .pt file corresponding to a run - Required                                                                             | `folder=checkpoints/tomato/2026-10-11_07-48-57/` |
-| `crop`        | The crop (name of subdirectory within the dataset root directory) you want to use in evaluation - Optional, leave it out to score runs on the crop they were trained on | `crop=tomato`                                    |
-| `split`       | The split the model should consider for evaluation                                                                                                                      | `split=test`                                     |
-| `data_root`   | Root dataset directory override. Use when the data_root in the corresponding `.hydra/config.yaml` does not exist on the current machine                                 | `data_root=/home/ciwa-full-split/`*              |
-| `device`      | Device where everything should happen: `cuda`, `cuda:<n>` for a specific GPU, or `cpu`.                                                                                 | `device=cuda:1`                                  |
-| `num_workers` | Number of processes loading data in parallel                                                                                                                            | `num_workers=8`                                  |
+| Argument      | Description                                                                                                                                                             | Example                                                    |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `folder`      | A run folder, any folder containing runs, or the .pt file corresponding to a run - Required                                                                             | `folder=checkpoints/deeplabv3/tomato/2026-10-11_07-48-57/` |
+| `crop`        | The crop (name of subdirectory within the dataset root directory) you want to use in evaluation - Optional, leave it out to score runs on the crop they were trained on | `crop=tomato`                                              |
+| `split`       | The split the model should consider for evaluation                                                                                                                      | `split=test`                                               |
+| `data_root`   | Root dataset directory override. Use when the data_root in the corresponding `.hydra/config.yaml` does not exist on the current machine                                 | `data_root=/home/ciwa-full-split/`*                        |
+| `device`      | Device where everything should happen: `cuda`, `cuda:<n>` for a specific GPU, or `cpu`.                                                                                 | `device=cuda:1`                                            |
+| `num_workers` | Number of processes loading data in parallel                                                                                                                            | `num_workers=8`                                            |
 
 *`null` as a value for this option means "use the one the model used during training"
 
@@ -281,10 +281,10 @@ python summarize.py folder=checkpoints/sweeps/<timestamp>/
 
 Takes a set of scored runs (as a result of automatic evaluation from `train.py` or manually via `evaluate.py`), reads the corresponding `metrics.json` for each run, groups runs that differ in seed only, and reports the mean ± standard deviation across stats for those runs. Prints one table per scored crop + split. Writes output to `<folder>/summary/summary.json` and `<folder>/summary/summarize.log`. The log holds the same table that's printed to the console.
 
-| Argument  | Description                                                                   | Example                                         |
-| --------- | ----------------------------------------------------------------------------- | ----------------------------------------------- |
-| `folder`  | A sweep, crop folder inside a sweep, or any folder containing runs - Required | `folder=checkpoints/sweeps/2026-10-22_18-02-44` |
-| `metrics` | Which scores to show, default is all 8                                        | `'metrics=[sunlit_iou,f1]'`                     |
+| Argument  | Description                                                                              | Example                                         |
+| --------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `folder`  | A sweep, a model or crop folder inside a sweep, or any folder containing runs - Required | `folder=checkpoints/sweeps/2026-10-22_18-02-44` |
+| `metrics` | Which scores to show, default is all 8                                                   | `'metrics=[sunlit_iou,f1]'`                     |
 
 ## Generating figures
 
@@ -297,7 +297,7 @@ python figures.py folder=checkpoints/sweeps/<timestamp>/ metric=precision
 **Example generation for a single run**:
 
 ```bash
-python figures.py folder=checkpoints/<crop>/<timestamp>/ metric=precision
+python figures.py folder=checkpoints/<model>/<crop>/<timestamp>/ metric=precision
 ```
 
 To generate figures, the script reads `history.json` from the model's training to generate `curves.png` plotting metrics against epochs. It also reads `eval/*/metrics.json` from the model evaluation to generate confusion matrices, one per scored split, output as `confusion-<crop>-<split>.png`. Finally it reads `summary/summary.json` from the summarization script to output one `comparison-<crop>-<split>.png` per section. The script also writes `overview-<split>.png` per scored split made from the same summary which shows all crops side by side, one bar per setting, with mean ± std across seeds. The overview only considers models **scored on the crop they were trained on** and is skipped with a log message when the summary covers fewer than two crops (since that would just repeat that single crop's comparison chart). If `summary.json` is missing, it will log a message telling you to run `summarize.py` first. Runs without a `history.json` won't be found (so won't have confusion matrices generated), but missing files in general will not result in an error.
@@ -308,7 +308,7 @@ Everything output by `figures.py` goes in `<folder>/figures/`, where per-run fig
 
 | Argument | Description                                                                                                                                                                                                | Example                                         |
 | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| `folder` | A sweep, crop folder inside a sweep, or any folder containing runs - Required                                                                                                                              | `folder=checkpoints/sweeps/2026-10-22_18-02-44` |
+| `folder` | A sweep, a model or crop folder inside a sweep, or any folder containing runs - Required                                                                                                                   | `folder=checkpoints/sweeps/2026-10-22_18-02-44` |
 | `metric` | Which metric to use for the curves, comparison, and overview charts - Default is `sunlit_iou`, must be one of [`accuracy`, `precision`, `recall`, `fpr`, `f1`, `sunlit_iou`, `non_sunlit_iou`, `mean_iou`] | `metric=f1`                                     |
 
 ## Predicting on new images
@@ -316,26 +316,26 @@ Everything output by `figures.py` goes in `<folder>/figures/`, where per-run fig
 **Example prediction (folder)**:
 
 ```bash
-python predict.py checkpoint=checkpoints/<crop>/<timestamp>/ input=<path/to/input/images> save_logits=True save_overlays=False
+python predict.py checkpoint=checkpoints/<model>/<crop>/<timestamp>/ input=<path/to/input/images> save_logits=True save_overlays=False
 ```
 
 **Example prediction (single image)**:
 
 ```bash
-python predict.py checkpoint=checkpoints/<crop>/<timestamp>/ input=<path/to/input/image.png> save_logits=False save_overlays=True
+python predict.py checkpoint=checkpoints/<model>/<crop>/<timestamp>/ input=<path/to/input/image.png> save_logits=False save_overlays=True
 ```
 
 Outputs are saved to `<run>/predict/<timestamp>` with a `predict.log` file and organized into folders corresponding to what they are: `masks/`, `logits/`, `overlays/`. Masks use the label colors and are named `<stem>_pred.png` to line up with `<stem>_L.png`. The other two outputs follow a similar scheme, with `_pred.png` being replaced by `_logits.npy` and `_overlay.png`. The overlays themselves tint only pixels predicted as `sunlit`. Saving the optional outputs (logits and overlays) can result in many large files being saved to your disk (~12 MB for logits per almond/citrus/grape image in the CIWA+ dataset), so saving them defaults to False.
 
 *Note: Logits are saved as [2, H, W] float32, channel 0 non-sunlit, channel 1 sunlit - Outputs for models trained with stretch sizing are resized back to native size*
 
-| Argument        | Description                                                                                 | Example                                                               |
-| --------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `checkpoint`    | A run folder or the .pt file inside of it - Required                                        | `checkpoint=checkpoints/tomato/2026-10-22_18-02-44/deeplabv3-best.pt` |
-| `input`         | Either a single image or a folder containing images to generate predictions from - Required | `input=$HOME/dataset/tomato/test/visual`                              |
-| `save_logits`   | Whether logits should be saved with the predicted masks                                     | `save_logits=True`                                                    |
-| `save_overlays` | Whether overlays should be saved with the predicted masks                                   | `save_overlays=False`                                                 |
-| `device`        | Device where everything should happen: `cuda`, `cuda:<n>` for a specific GPU, or `cpu`.     | `device=cuda:1`                                                       |
+| Argument        | Description                                                                                 | Example                                                                         |
+| --------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `checkpoint`    | A run folder or the .pt file inside of it - Required                                        | `checkpoint=checkpoints/deeplabv3/tomato/2026-10-22_18-02-44/deeplabv3-best.pt` |
+| `input`         | Either a single image or a folder containing images to generate predictions from - Required | `input=$HOME/dataset/tomato/test/visual`                                        |
+| `save_logits`   | Whether logits should be saved with the predicted masks                                     | `save_logits=True`                                                              |
+| `save_overlays` | Whether overlays should be saved with the predicted masks                                   | `save_overlays=False`                                                           |
+| `device`        | Device where everything should happen: `cuda`, `cuda:<n>` for a specific GPU, or `cpu`.     | `device=cuda:1`                                                                 |
 
 ## Extending the suite
 
