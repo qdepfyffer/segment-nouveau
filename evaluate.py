@@ -42,21 +42,25 @@ def main(cfg: DictConfig):
     for number, run in enumerate(runs, start=1):
         log.info(f"[{number}/{len(runs)}] Scoring {run}")
 
-        # Determine where the run's scores go
-        run_out = run / "eval" / f"{cfg.crop.name}-{cfg.split}"
-
         handler = None
-        if run_out.resolve() != out_dir.resolve():  # A single run already logs here through Hydra
-            run_out.mkdir(parents=True, exist_ok=True)
-            handler = logging.FileHandler(run_out / "evaluate.log", mode="w")
-            handler.setFormatter(logging.Formatter("[%(asctime)s][%(name)s][%(levelname)s] - %(message)s"))
-            logging.getLogger().addHandler(handler)
         try:
             # Load the run that is currently being scored
             model, settings = load_checkpoint(run, cfg.device)
 
+            # Score on the crop given on the command line, otherwise on the crop the run was trained on
+            crop = cfg.crop.name if "crop" in cfg else settings.crop.name
+
+            # Determine where the run's scores go
+            run_out = run / "eval" / f"{crop}-{cfg.split}"
+
+            if run_out.resolve() != out_dir.resolve():  # A single run already logs here through Hydra
+                run_out.mkdir(parents=True, exist_ok=True)
+                handler = logging.FileHandler(run_out / "evaluate.log", mode="w")
+                handler.setFormatter(logging.Formatter("[%(asctime)s][%(name)s][%(levelname)s] - %(message)s"))
+                logging.getLogger().addHandler(handler)
+
             # Score the run
-            score_run(model, settings, cfg.data_root, cfg.crop.name, cfg.split, run_out, num_workers=cfg.num_workers)
+            score_run(model, settings, cfg.data_root, crop, cfg.split, run_out, num_workers=cfg.num_workers)
 
             # Free memory before we start the next run otherwise bigger models are going to hurt
             del model, settings

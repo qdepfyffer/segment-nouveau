@@ -251,23 +251,23 @@ Evaluation results are saved to `<run>/eval/<crop>-<split>/metrics.json`, where 
 **Example multi-evaluation**:
 
 ```bash
-python evaluate.py folder=checkpoints/sweeps/<timestamp>/ crop=tomato
+python evaluate.py folder=checkpoints/sweeps/<timestamp>/
 ```
 
-Evaluation of a whole sweep will score any `*-best.pt` files contained in the `folder` or any of `folder`'s subdirectories. An overall evaluate.log will be created in `<folder>/eval/<crop>-<split>/` which will list each run along with any failures. One failed run should not stop the others.
+Evaluation of a whole sweep will score any `*-best.pt` files contained in the `folder` or any of `folder`'s subdirectories. An overall evaluate.log will be created in `<folder>/eval/<crop>-<split>/` which will list each run along with any failures. When no crop is given the overall log goes to `<folder>/eval/own-crop-<split>/`. One failed run should not stop the others.
 
 *Note: you can score a model on a crop different from the one it trained on, since `crop` is just the dataset being scored*
 
 ### Command line arguments (Evaluation)
 
-| Argument      | Description                                                                                                                             | Example                                          |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| `folder`      | A run folder, any folder containing runs, or the .pt file corresponding to a run - Required                                             | `folder=checkpoints/tomato/2026-10-11_07-48-57/` |
-| `crop`        | The crop (name of subdirectory within the dataset root directory) you want to use in evaluation - Required                              | `crop=tomato`                                    |
-| `split`       | The split the model should consider for evaluation                                                                                      | `split=test`                                     |
-| `data_root`   | Root dataset directory override. Use when the data_root in the corresponding `.hydra/config.yaml` does not exist on the current machine | `data_root=/home/ciwa-full-split/`*              |
-| `device`      | Device where everything should happen: `cuda`, `cuda:<n>` for a specific GPU, or `cpu`.                                                 | `device=cuda:1`                                  |
-| `num_workers` | Number of processes loading data in parallel                                                                                            | `num_workers=8`                                  |
+| Argument      | Description                                                                                                                                                             | Example                                          |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `folder`      | A run folder, any folder containing runs, or the .pt file corresponding to a run - Required                                                                             | `folder=checkpoints/tomato/2026-10-11_07-48-57/` |
+| `crop`        | The crop (name of subdirectory within the dataset root directory) you want to use in evaluation - Optional, leave it out to score runs on the crop they were trained on | `crop=tomato`                                    |
+| `split`       | The split the model should consider for evaluation                                                                                                                      | `split=test`                                     |
+| `data_root`   | Root dataset directory override. Use when the data_root in the corresponding `.hydra/config.yaml` does not exist on the current machine                                 | `data_root=/home/ciwa-full-split/`*              |
+| `device`      | Device where everything should happen: `cuda`, `cuda:<n>` for a specific GPU, or `cpu`.                                                                                 | `device=cuda:1`                                  |
+| `num_workers` | Number of processes loading data in parallel                                                                                                                            | `num_workers=8`                                  |
 
 *`null` as a value for this option means "use the one the model used during training"
 

@@ -1,5 +1,5 @@
 defaults:
-  - crop: ???     # The crop to evaluate
+  - crop: null    # null = score each run on the crop it was trained on, crop=<name> = score every run on that crop
   - override hydra/job_logging: custom
   - _self_
 
@@ -12,8 +12,7 @@ num_workers: 4    # Number of processes for parallel loading of examples
 
 hydra:
   run:
-    dir: ${run_folder:${folder}}/eval/${crop.name}-${split}
+    dir: ${run_folder:${folder}}/eval/${oc.select:crop.name,own-crop}-${split}
   sweep:
     dir: ${run_folder:${folder}}/eval
-    subdir: ${crop.name}-${split}
-    
+    subdir: ${oc.select:crop.name,own-crop}-${split}
