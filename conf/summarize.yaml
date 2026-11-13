@@ -4,6 +4,8 @@ defaults:
 
 folder: ???     # The sweep folder that should be searched
 metrics: [accuracy, precision, recall, fpr, f1, sunlit_iou, non_sunlit_iou, mean_iou] # Keys from "scores" in metrics.json
+best_split: valid  # Split used for each setting's best seed - never test, or test won't be a fair estimate
+best_metric: mean_iou  # Score used for picking each setting's best seed
 
 hydra:
   run:

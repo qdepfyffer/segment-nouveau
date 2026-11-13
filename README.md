@@ -279,12 +279,14 @@ Evaluation of a whole sweep will score any `*-best.pt` files contained in the `f
 python summarize.py folder=checkpoints/sweeps/<timestamp>/
 ```
 
-Takes a set of scored runs (as a result of automatic evaluation from `train.py` or manually via `evaluate.py`), reads the corresponding `metrics.json` for each run, groups runs that differ in seed only, and reports the mean ± standard deviation across stats for those runs. Prints one table per scored crop + split. Writes output to `<folder>/summary/summary.json` and `<folder>/summary/summarize.log`. The log holds the same table that's printed to the console.
+Takes a set of scored runs (as a result of automatic evaluation from `train.py` or manually via `evaluate.py`), reads the corresponding `metrics.json` for each run, groups runs that differ in seed only, and reports the mean ± standard deviation across stats for those runs. Prints one table per scored crop + split. Writes output to `<folder>/summary/summary.json` and `<folder>/summary/summarize.log`. The log holds the same table that's printed to the console. After the tables it lists each setting's best seed (by `best_split` `best_metric`, valid mean IoU by default) and stores them under `best_runs` in `summary.json`. Ties go to the first seed found, which is unlikely to matter with the current precision used for storing scores.
 
-| Argument  | Description                                                                              | Example                                         |
-| --------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| `folder`  | A sweep, a model or crop folder inside a sweep, or any folder containing runs - Required | `folder=checkpoints/sweeps/2026-10-22_18-02-44` |
-| `metrics` | Which scores to show, default is all 8                                                   | `'metrics=[sunlit_iou,f1]'`                     |
+| Argument      | Description                                                                              | Example                                         |
+| ------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `folder`      | A sweep, a model or crop folder inside a sweep, or any folder containing runs - Required | `folder=checkpoints/sweeps/2026-10-22_18-02-44` |
+| `metrics`     | Which scores to show, default is all 8                                                   | `'metrics=[sunlit_iou,f1]'`                     |
+| `best_split`  | Split used for each setting's best seed, should be kept as `valid`                       | `best_split=valid`                               |
+| `best_metric` | Score used for picking each setting's best seed                                          | `best_metric=accuracy`                         |
 
 ## Generating figures
 

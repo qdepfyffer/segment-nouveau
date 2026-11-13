@@ -18,6 +18,9 @@ log = logging.getLogger(__name__)
 # Config keys that are left out of sweep folder names + the seed - differences in these don't necessarily mean a different experiment
 NON_SETTING_KEYS = {"seed", "data_root", "output_dir", "device", "num_workers", "eval_splits"}
 
+# Scores where a lower value is better, everything else is better with a higher value
+LOWER_IS_BETTER = {"fpr"}
+
 @hydra.main(config_path="conf", config_name="summarize", version_base="1.3")
 def main(cfg: DictConfig):
 
@@ -97,6 +100,21 @@ def main(cfg: DictConfig):
             # Store the mean and stdev in the group
             group["stats"][name] = {"mean": mean_scores, "std": std_scores}
 
+    # Pick the best seed for each setting by its score on its own crop's best split (which defaults to valid)
+    pick = min if cfg.best_metric in LOWER_IS_BETTER else max
+    best_runs = {}
+    for (eval_crop, eval_split, train_crop, setting), group in groups.items():
+        if eval_crop != train_crop or eval_split != cfg.best_split:
+            continue  # Scores on other crops or splits don't take part in choosing
+
+        # Validate metric name
+        if cfg.best_metric not in group["scores"][0]:
+            raise ValueError(f"{cfg.best_metric} not found in list of valid metrics: {sorted(group['scores'][0])}")
+
+        values = [scores[cfg.best_metric] for scores in group["scores"]]
+        best = pick(range(len(values)), key=lambda i: values[i])  # Index of best run for this group
+        best_runs[f"{train_crop}/{setting}"] = {"run_folder": str(group["runs"][best].relative_to(cfg.folder)), "value": values[best]}
+
     # Work out the width for the name column and set the padding value for other columns
     label = "trained on / setting"
     name_width = max([len(f"{key[2]}/{key[3]}") for key in groups] + [len(label)])
@@ -140,6 +158,15 @@ def main(cfg: DictConfig):
         section_name = f"{eval_crop}-{eval_split}"
         section_results = summary["results"].setdefault(section_name, {})
         section_results[row_name] = {"runs": runs, "run_folders": run_folders, "stats": stats}
+
+    # Point out location of each setting's best seed
+    if best_runs:
+        log.info(f"Best seed per setting (by {cfg.best_split} {cfg.best_metric})")
+        for row_name, best in sorted(best_runs.items()):
+            log.info(f"{best['run_folder']} ({cfg.best_metric}: {best['value']:.4f})")
+    else:
+        log.warning(f"No runs were scored on their own crop's {cfg.best_split} split, so no best seeds could be picked.")
+    summary["best_runs"] = {"split": cfg.best_split, "metric": cfg.best_metric, "runs": best_runs}
 
     summary_path = out_dir / "summary.json"
     with open(summary_path, "w") as file:
