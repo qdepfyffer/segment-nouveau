@@ -10,7 +10,7 @@ from pathlib import Path
 import hydra
 import torch
 from hydra.core.hydra_config import HydraConfig
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -27,6 +27,24 @@ from models import build_model
 
 # Set up logging
 log = logging.getLogger(__name__)
+
+# Options that don't change how a model is being trained, so they're ok to vary when a run is resumed
+RUN_ONLY_KEYS = {"resume", "data_root", "output_dir", "device", "num_workers", "eval_splits"}
+
+
+# Pulled out logic for safe file saving since we use it in two places now
+def save_safely(contents, path: Path) -> None:
+    """
+    Saves to a temp file first and then swaps it in so nothing can ever read a half written file
+    :param contents:    Whatever should be saved via torch.save
+    :param path:        Where the file should end up
+    :return:            None
+    """
+
+    temp_path = path.with_suffix(".tmp")  # Temp file, lives next to the real one - this only creates a path, no file exists yet
+    torch.save(contents, temp_path)
+    temp_path.replace(path)  # .replace() instead of .rename() - .rename() fails on Windows if the file already exists
+
 
 @hydra.main(config_path="conf", config_name="train", version_base="1.3")
 def main(cfg: DictConfig) -> None:
@@ -62,9 +80,10 @@ def main(cfg: DictConfig) -> None:
     # Use our RNG seed
     torch.manual_seed(cfg.seed)
 
-    # Determine output directory
+    # Determine output directory and path to most recent set of weights
     out_dir = Path(HydraConfig.get().runtime.output_dir)
     best_model_path = out_dir / f"{cfg.model.name}-best.pt"
+    last_path = out_dir / f"{cfg.model.name}-last.pt"  # Everything needed to carry on training if the run gets interrupted
 
     # Capture current git repo commit hash and whether or not the repo is dirty (uncommitted changes)
     revision = git_info()
@@ -127,8 +146,39 @@ def main(cfg: DictConfig) -> None:
 
     # Begin model training
     epochs_without_improvement = 0
+    start_epoch = 0  # Which epoch the training loop starts from - only changes when runs are resumed
+
+    # Settings that need to match for a run to be resumed
+    training_settings = {key: value for key, value in OmegaConf.to_container(cfg, resolve=True).items() if key not in RUN_ONLY_KEYS}
+
+    # Pick up where interrupted run left off
+    if cfg.resume and last_path.is_file():
+        state = torch.load(last_path, map_location="cpu", weights_only=True)  # Load the most recently completed epoch into state
+
+        # Refuse to resume if any settings that impact training results have changed since the run started
+        different = sorted(key for key in state["settings"].keys() | training_settings.keys() if state["settings"].get(key) != training_settings.get(key))
+        if different:
+            raise ValueError(f"Can't resume {out_dir} - these settings differ from when it started: {', '.join(different)}")
+        if state["code"] != revision:
+            log.warning(f"This run was started on commit {state['code']['commit']} (uncommitted changes: {state['code']['dirty']}) - the rest of it will be trained on the current revision")
+
+        # Put everything back the way it was at the end of the most recently completed epoch
+        model.load_state_dict(state["model"])
+        optimizer.load_state_dict(state["optimizer"])
+        torch.set_rng_state(state["rng"])  # Same shuffling and random crops as an uninterrupted run would get
+        best_value = state["best_value"]
+        best_epoch = state["best_epoch"]
+        epochs_without_improvement = state["epochs_without_improvement"]
+        history = state["history"]
+
+        # A run that already stopped early has nothing left to train
+        start_epoch = state["epoch"] if epochs_without_improvement < cfg.patience else cfg.epochs
+        log.info(f"Resuming after epoch {state['epoch']} (best epoch so far: {best_epoch})")
+    elif cfg.resume:
+        log.warning(f"resume=true but there's no {last_path.name} in {out_dir} - starting from scratch")
+
     model.train()
-    for epoch in range(cfg.epochs):
+    for epoch in range(start_epoch, cfg.epochs):
         # Training loop
         total_train_loss = 0.0
         for images, masks in tqdm(train_loader, desc=bar_desc(log, f"[TRAIN] Epoch {epoch + 1}")):
@@ -217,10 +267,8 @@ def main(cfg: DictConfig) -> None:
             # Update best epoch
             best_epoch = epoch + 1
 
-            # Prevent anything from reading a half-written set of weights (since torch takes a second to write the file)
-            temp_path = best_model_path.with_suffix(".tmp")  # Temporary file next to the real one - with_suffix() creates a path only; no file exists
-            torch.save(model.state_dict(), temp_path)  # Write the weights to the temporary file - the actual weights file that is read by scripts in this repo isn't touched yet
-            temp_path.replace(best_model_path)  # Then swap it in (the finished weights file) - rename the .tmp file to .pt, replacing the old file (.replace() is used instead of .rename() because .rename() fails on windows for existing paths)
+            # Save the weights safely so that nothing can ever read a half written set of weights
+            save_safely(model.state_dict(), best_model_path)
 
             log.info(f"Best model saved to: {best_model_path}")
             epochs_without_improvement = 0
@@ -228,6 +276,20 @@ def main(cfg: DictConfig) -> None:
             # Otherwise don't save the model, increment our patience counter and inform the user that the model hasn't improved
             epochs_without_improvement += 1
             log.info(f"Early stopping: {epochs_without_improvement} / {cfg.patience} epochs without improvement of {cfg.monitor}")
+
+        # Save everything necessary to carry on training from this point if it is interrupted
+        save_safely({
+            "settings": training_settings,
+            "code": revision,
+            "epoch": epoch + 1,  # Number of finished epochs
+            "model": model.state_dict(),
+            "optimizer": optimizer.state_dict(),
+            "best_value": best_value,
+            "best_epoch": best_epoch,
+            "epochs_without_improvement": epochs_without_improvement,
+            "history": history,
+            "rng": torch.get_rng_state(),
+        }, last_path)
 
         # Break out of the epoch loop if we hit our patience limit
         if epochs_without_improvement >= cfg.patience:
@@ -255,7 +317,11 @@ def main(cfg: DictConfig) -> None:
             raise FileNotFoundError(f"Checkpoint not found: {best_model_path}")  # Exit early if the checkpoint doesn't exist for any reason - Caught below, logged, then re-raised
         model, settings = load_checkpoint(out_dir, cfg.device)
         for split in eval_splits:
-            score_run(model, settings, None, cfg.crop.name, split, out_dir / "eval" / f"{cfg.crop.name}-{split}", num_workers=cfg.num_workers)
+            split_dir = out_dir / "eval" / f"{cfg.crop.name}-{split}"
+            if cfg.resume and (split_dir / "metrics.json").is_file():
+                log.info(f"Already scored on {split} - skipping")
+                continue  # A resumed run that was already scored should keep its scores
+            score_run(model, settings, None, cfg.crop.name, split, split_dir, num_workers=cfg.num_workers)
     except Exception:
         log.exception("Automatic scoring failed - training results intact, score them with evaluate.py")
         raise  # Mark this run as failed, sweep should still finish its other runs and report failures at the end (re-throws the error that was just caught)

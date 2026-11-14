@@ -16,6 +16,9 @@ For reference: This repo was built based on [AIISLab segment-main](https://githu
  - This project uses [hydra](https://hydra.cc/) now, rather than argparse. This changes the way command line arguments are input (`arg=val` instead of `--arg val`) and adds some new functionalities.
  - When passing filepaths for the data_root parameter, use full paths; $HOME/... works, a bare ~/... doesn't (%USERPROFILE%\\... in Windows CMD rather than $HOME/...).
  - Scripts that work on one model take checkpoint (a run folder or the .pt inside it). Scripts that can work on many runs take folder (a single run, a crop folder, or a whole sweep).
+ - When resuming a sweep, warnings about a missing `last.pt` file are expected since those jobs were never started.
+ - Resuming will overwrite `multirun.yaml` and each job's own `.hydra/` folder.
+ - Wait a bit before resuming on the same GPU so dead processes can release their memory first.
 
 ## README contents:
 
@@ -144,7 +147,7 @@ Tensor sum: 12.0
 - `deeplabv3` (DeepLabV3 with a MobileNet backbone, ~11.0M parameters)
 - `frrn_a` (full FRRN-A, ~17.7M parameters, needs a lot of GPU memory)
 - `frrn_a_lite` (reduced FRRN-A, ~1.4M parameters, width set by `model.base`)
-- `fcdensenet` (FC-DenseNet103 matching the ~25.7M parameter version used in the 2026 CIWA tomato paper, also very memory hungry)
+- `fcdensenet103` (FC-DenseNet103 matching the ~25.7M parameter version used in the 2026 CIWA tomato paper, also very memory hungry)
 
 See [Checking a model's size and memory](#checking-a-models-size-and-memory) before picking a `batch_size`.
 
@@ -154,7 +157,7 @@ See [Checking a model's size and memory](#checking-a-models-size-and-memory) bef
 python train.py data_root=/full/path/to/dataset crop=tomato epochs=100 patience=7 lr=1e-4 seed=0
 ```
 
-Checkpoints are saved to `checkpoints/<model>/<crop>/<timestamp>/<model>-best.pt` by default, along with a `.hydra/` folder that contains `config.yaml` and `overrides.yaml` detailing how the training was configured, and the `history.json` and `train.log` that accompanied their training. A `git.json` file is written in the same location which details the state of the repo at the time the training was run. Models are automatically evaluated against each split in `eval_splits` (test split by default) corresponding to the crop they were trained on, and evaluation results are in `eval/<crop>-<split>/metrics.json`.
+Checkpoints are saved to `checkpoints/<model>/<crop>/<timestamp>/<model>-best.pt` by default, along with a `.hydra/` folder that contains `config.yaml` and `overrides.yaml` detailing how the training was configured, and the `history.json` and `train.log` that accompanied their training. A `git.json` file is written in the same location which details the state of the repo at the time the training was run. Models are automatically evaluated against each split in `eval_splits` (test split by default) corresponding to the crop they were trained on, and evaluation results are in `eval/<crop>-<split>/metrics.json`. For the purpose of resuming runs (see [Resuming an interrupted run](#resuming-an-interrupted-run)), training also writes `<model>-last.pt` alongside `<model>-best.pt`.
 
 **Example multi-run**:
 
@@ -162,7 +165,7 @@ Checkpoints are saved to `checkpoints/<model>/<crop>/<timestamp>/<model>-best.pt
 python train.py --multirun data_root=/full/path/to/dataset crop=tomato epochs=100 patience=7 lr=1e-4,1e-3 seed=0,1,2
 ```
 
-Sweeps (see above multi-run example) output to `checkpoints/sweeps/<timestamp>/<model>/<crop>/<settings>/`, where `<settings>` refers to the unique settings used to generate that specific checkpoint, e.g., `epochs-100+lr-1e-4+patience-7+seed-0` and `<model>` refers to the specific model that was trained. Non-experimental keys like `device` or `num_workers` are left out of these settings, so changing them won't split a sweep's groupings. 
+Sweeps (see above multi-run example) output to `checkpoints/sweeps/<timestamp>/<model>/<crop>/<settings>/`, where `<settings>` refers to the unique settings used to generate that specific checkpoint, e.g., `epochs-100+lr-1e-4+patience-7+seed-0` and `<model>` refers to the specific model that was trained. Non-experimental keys like `device` or `num_workers` are left out of these settings, so changing them won't split a sweep's groupings. Similarly to single runs, training also writes `<model>-last.pt` alongside `<model>-best.pt`.
 
 *Note: When passing a path, use `$HOME` instead of `~`, and if passing a list, arguments must be quoted (see `eval_splits` and `crop.train_crop` below and note the single quotes around the flags)*
 
@@ -190,10 +193,27 @@ Sweeps (see above multi-run example) output to `checkpoints/sweeps/<timestamp>/<
 | `sizing`           | How images are sized for the model: native = random training crops, full size imgs for validation/scoring; stretch512 resizes everything to 512x512             | `sizing=stretch512`                |
 | `device`           | Device where everything should happen: `cuda`, `cuda:<n>` for a specific GPU, or `cpu`.                                                                         | `device=cuda:1`                    |
 | `num_workers`      | Number of processes loading data in parallel - note that this does in fact result in different random crops, so keep it the same when trying to reproduce a run | `num_workers=8`                    |
+| `resume`           | Carry on from the last finished epoch in an existing run folder - see [Resuming an interrupted run](#resuming-an-interrupted-run)                               | `resume=true`                      |
 
 *`'eval_splits=[]'` disables automatic post-training evaluation
 
 **`lr=1e-4` and `lr=0.0001` will create different folders despite being equivalent values.
+
+### Resuming an interrupted run
+
+Every epoch, training saves `<model>-last.pt` next to `<model>-best.pt`, holding everything needed to carry on (weights, optimizer state, early-stopping counters, history and random state). To resume, run the same command again with `resume=true` and point Hydra at the existing folder:
+
+**Example resuming single run**:
+```bash
+python train.py <same arguments as used to start initial training> hydra.run.dir=checkpoints/<model>/<crop>/<timestamp> resume=true
+```
+
+**Example resuming sweep**:
+```bash
+python train.py --multirun <same arguments as used to start initial training> hydra.sweep.dir=checkpoints/sweeps/<timestamp> resume=true
+```
+
+The run refuses to resume if any training setting differs from when it started, and names the setting. `data_root`, `device`, `num_workers` and `eval_splits` may differ. An interrupted epoch is started over. Splits that were already scored are not scored again. `<model>-last.pt` is about twice the size of `<model>-best.pt`, and can be deleted once a run or sweep is completely finished.
 
 ### Choosing a GPU for training
 
@@ -285,8 +305,8 @@ Takes a set of scored runs (as a result of automatic evaluation from `train.py` 
 | ------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------- |
 | `folder`      | A sweep, a model or crop folder inside a sweep, or any folder containing runs - Required | `folder=checkpoints/sweeps/2026-10-22_18-02-44` |
 | `metrics`     | Which scores to show, default is all 8                                                   | `'metrics=[sunlit_iou,f1]'`                     |
-| `best_split`  | Split used for each setting's best seed, should be kept as `valid`                       | `best_split=valid`                               |
-| `best_metric` | Score used for picking each setting's best seed                                          | `best_metric=accuracy`                         |
+| `best_split`  | Split used for each setting's best seed, should be kept as `valid`                       | `best_split=valid`                              |
+| `best_metric` | Score used for picking each setting's best seed                                          | `best_metric=accuracy`                          |
 
 ## Generating figures
 

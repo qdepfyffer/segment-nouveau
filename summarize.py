@@ -16,7 +16,7 @@ from omegaconf import DictConfig
 log = logging.getLogger(__name__)
 
 # Config keys that are left out of sweep folder names + the seed - differences in these don't necessarily mean a different experiment
-NON_SETTING_KEYS = {"seed", "data_root", "output_dir", "device", "num_workers", "eval_splits"}
+NON_SETTING_KEYS = {"seed", "data_root", "output_dir", "device", "num_workers", "eval_splits", "resume"}
 
 # Scores where a lower value is better, everything else is better with a higher value
 LOWER_IS_BETTER = {"fpr"}
