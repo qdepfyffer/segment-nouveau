@@ -149,7 +149,9 @@ def main(cfg: DictConfig) -> None:
     start_epoch = 0  # Which epoch the training loop starts from - only changes when runs are resumed
 
     # Settings that need to match for a run to be resumed
-    training_settings = {key: value for key, value in OmegaConf.to_container(cfg, resolve=True).items() if key not in RUN_ONLY_KEYS}
+    config = OmegaConf.to_container(cfg, resolve=True)
+    assert isinstance(config, dict)  # A DictConfig always converts to a dict so this just shuts up the type checker
+    training_settings = {key: value for key, value in config.items() if key not in RUN_ONLY_KEYS}
 
     # Pick up where interrupted run left off
     if cfg.resume and last_path.is_file():
